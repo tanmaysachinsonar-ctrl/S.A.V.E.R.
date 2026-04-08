@@ -291,6 +291,8 @@ def drone_nav_loop():
     RECOVERY_TRIMS              = 7      # Anzahl Trims Richtung Ziel nach Vollstopp
     consecutive_stop_count      = 0      # Aufeinanderfolgende STOP-Befehle (max 2 senden)
     MAX_CONSECUTIVE_STOPS       = 2      # Drohne nicht mit STOPs fluten
+    corridor_inside_count       = 0      # Konsekutive Frames innerhalb Korridor (Hysterese)
+    CORRIDOR_REENTER_FRAMES     = 5      # So viele Frames innen bevor Außen-Check reaktiviert
     _OPPOSITE = {"VOR": "ZURUECK", "ZURUECK": "VOR", "RECHTS": "LINKS", "LINKS": "RECHTS"}
 
     def try_send(cmd):
@@ -375,6 +377,7 @@ def drone_nav_loop():
             full_stopped             = False
             recovery_trims_sent_count = 0
             consecutive_stop_count   = 0
+            corridor_inside_count    = 0
             corridor_defined         = False
             corridor_start           = None
             corridor_end             = None
@@ -401,7 +404,7 @@ def drone_nav_loop():
         if not (found_a and found_b and drone_orientation_angle is not None) or aruco_lost_count > ARUCO_NAV_LOST_TOLERANCE:
             if aruco_lost_count > ARUCO_NAV_LOST_TOLERANCE:
                 if brake_trims_sent < ARUCO_BRAKE_TRIMS:
-                    # Gegentrim: Drohne abbremsen statt hart zu stoppen
+                    # Gegentrim: Drohne abbremsen – NIE STOP senden!
                     if now - last_command_time >= COMMAND_INTERVAL:
                         sender = _pico_sender
                         if sender:
@@ -416,45 +419,39 @@ def drone_nav_loop():
                                 brake_cmds.append(_OPPOSITE[last_long_cmd])
                                 consecutive_stop_count = 0
                             if not brake_cmds:
-                                if consecutive_stop_count < MAX_CONSECUTIVE_STOPS:
-                                    sender.send("STOP")
-                                    consecutive_stop_count += 1
-                                brake_cmds = ["STOP"]
+                                # Kein letzter Befehl bekannt → nichts senden, warten
+                                brake_cmds = ["WARTE"]
                         brake_trims_sent += 1
                         last_command_time = now
                         g["drone_nav_cmd"] = f"BREMSEN {brake_trims_sent}/{ARUCO_BRAKE_TRIMS}: {' '.join(brake_cmds)}"
                         print(f"[BRAKE] ArUco weg ({aruco_lost_count}f), Gegentrim {brake_trims_sent}/{ARUCO_BRAKE_TRIMS}: {brake_cmds}")
-                else:
+                elif recovery_trims_sent_count < RECOVERY_TRIMS:
+                    # Nach Bremsen: Recovery-Trims Richtung Ziel (Marker freilegen)
                     if not full_stopped:
-                        emergency_stop()
                         full_stopped = True
                         recovery_trims_sent_count = 0
                         last_command_time = now
-                        g["drone_nav_cmd"] = "ARUCO VERLOREN – STOP"
-                        print("[ARUCO] Vollstopp – starte Recovery-Trims")
-                    elif recovery_trims_sent_count < RECOVERY_TRIMS:
-                        if now - last_command_time >= COMMAND_INTERVAL:
-                            sender = _pico_sender
-                            if sender:
-                                cmds = []
-                                if last_long_cmd:
-                                    sender.send(last_long_cmd)
-                                    cmds.append(last_long_cmd)
-                                    consecutive_stop_count = 0
-                                if last_lat_cmd:
-                                    sender.send(last_lat_cmd)
-                                    cmds.append(last_lat_cmd)
-                                    consecutive_stop_count = 0
-                                if not cmds:
-                                    if consecutive_stop_count < MAX_CONSECUTIVE_STOPS:
-                                        sender.send("STOP")
-                                        consecutive_stop_count += 1
-                                    cmds = ["STOP"]
-                            recovery_trims_sent_count += 1
-                            last_command_time = now
-                            g["drone_nav_cmd"] = f"RECOVERY {recovery_trims_sent_count}/{RECOVERY_TRIMS}: {' '.join(cmds)}"
-                            print(f"[RECOVERY] Trim {recovery_trims_sent_count}/{RECOVERY_TRIMS}: {cmds}")
-                    # else: halten – warte auf ArUco ohne weiteren Befehl
+                        g["drone_nav_cmd"] = "ARUCO VERLOREN – GEBREMST"
+                        print("[ARUCO] Gebremst – starte Recovery-Trims")
+                    elif now - last_command_time >= COMMAND_INTERVAL:
+                        sender = _pico_sender
+                        if sender:
+                            cmds = []
+                            if last_long_cmd:
+                                sender.send(last_long_cmd)
+                                cmds.append(last_long_cmd)
+                                consecutive_stop_count = 0
+                            if last_lat_cmd:
+                                sender.send(last_lat_cmd)
+                                cmds.append(last_lat_cmd)
+                                consecutive_stop_count = 0
+                            if not cmds:
+                                cmds = ["WARTE"]
+                        recovery_trims_sent_count += 1
+                        last_command_time = now
+                        g["drone_nav_cmd"] = f"RECOVERY {recovery_trims_sent_count}/{RECOVERY_TRIMS}: {' '.join(cmds)}"
+                        print(f"[RECOVERY] Trim {recovery_trims_sent_count}/{RECOVERY_TRIMS}: {cmds}")
+                # else: alle Trims gesendet – warte auf ArUco ohne weiteren Befehl
             continue
 
         # ── Zeitsteuerung ─────────────────────────────────────────────────────
@@ -488,12 +485,9 @@ def drone_nav_loop():
                     slowdown_state           = True
                     slowdown_trims_remaining = SLOWDOWN_TRIMS
                     print(f"[SLOWDOWN] Eingetreten – sende {slowdown_trims_remaining} Trims")
-                if slowdown_state and slowdown_trims_remaining <= 0:
-                    # Trims erschöpft → zurück zu normaler Navigation, KEIN STOP.
-                    # Ein STOP hier würde den State zurücksetzen und die Zone im
-                    # nächsten Frame sofort neu initialisieren → endloser Stop-Loop.
-                    slowdown_state = False
-                    print("[SLOWDOWN] Trims aufgebraucht – normale Navigation fortgesetzt")
+                # slowdown_state bleibt True auch wenn Trims aufgebraucht sind!
+                # Der Navigations-Code unten nutzt dann den else-Branch (normaler Trim)
+                # weil slowdown_trims_remaining <= 0.  Reset erst beim VERLASSEN der Zone.
             else:
                 if slowdown_state:
                     slowdown_state           = False
@@ -508,10 +502,17 @@ def drone_nav_loop():
             in_corridor   = True
             in_outer_zone = (dist < ORIENTATION_UPDATE_RADIUS)
 
-        # Außenbereich-Check reaktivieren sobald Drohne zurück im Korridor
-        if in_corridor and not target_zone_enabled:
-            target_zone_enabled = True
-            print(f"[CORRIDOR] Zurück im Korridor – Außenbereich-Check reaktiviert")
+        # Außenbereich-Check reaktivieren mit Hysterese:
+        # Drohne muss CORRIDOR_REENTER_FRAMES lang durchgehend im Korridor sein,
+        # damit der Außenbereich-Check wieder scharf wird. Verhindert Oszillation
+        # am Korridorrand (rein → Check aktiv → raus → STOP → rein → ...).
+        if in_corridor:
+            corridor_inside_count += 1
+            if not target_zone_enabled and corridor_inside_count >= CORRIDOR_REENTER_FRAMES:
+                target_zone_enabled = True
+                print(f"[CORRIDOR] {CORRIDOR_REENTER_FRAMES} Frames innen – Außenbereich-Check reaktiviert")
+        else:
+            corridor_inside_count = 0
 
         if in_outer_zone and target_zone_enabled:
             command_text = "KORRIDOR VERLASSEN -> STOP"
@@ -593,11 +594,11 @@ def drone_nav_loop():
                     sent = True
 
         if not sent:
-            # Sicherheitsnetz: kein Befehl konnte gesendet werden (z.B. alle
-            # try_send() durch MAX_TRIM_COUNT geblockt, oder keine Richtung nötig).
-            # Ohne diesen STOP würde die Drohne ungebremst driften.
-            emergency_stop()
-            command_text = "STOP"
+            # Kein Trim gesendet – entweder MAX_TRIM_COUNT erreicht oder Deadzone.
+            # KEIN STOP und KEIN Counter-Reset! Die Drohne hält ihre aktuelle
+            # Geschwindigkeit (coasted).  Counter-Reset würde das Trim-Limit
+            # aushebeln (29 → Reset → 29 → ...), STOP würde allen Schwung töten.
+            command_text = "COAST"
             sent = True
 
         if sent:
