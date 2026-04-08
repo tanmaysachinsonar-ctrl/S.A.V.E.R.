@@ -155,9 +155,15 @@ class _MJPEGHandler(BaseHTTPRequestHandler):
             from urllib.parse import urlparse, parse_qs
             qs = parse_qs(urlparse(self.path).query)
             do = qs.get("do", [""])[0]
-            if   do == "confirm":     threading.Thread(target=confirm_rescue, daemon=True).start()
-            elif do == "false_alarm": threading.Thread(target=reset_alarm, args=(None, "❌ Fehlalarm – System bereit."),            daemon=True).start()
-            elif do == "done":        threading.Thread(target=reset_alarm, args=(None, "✅ Rettung abgeschlossen – System bereit!"), daemon=True).start()
+            if   do == "confirm":
+                g["tg_action_note"] = ("📱 Rettung wurde per Handy bestätigt", time.time())
+                threading.Thread(target=confirm_rescue, daemon=True).start()
+            elif do == "false_alarm":
+                g["tg_action_note"] = ("📱 Fehlalarm wurde per Handy markiert", time.time())
+                threading.Thread(target=reset_alarm, args=(None, "❌ Fehlalarm – System bereit."),            daemon=True).start()
+            elif do == "done":
+                g["tg_action_note"] = ("📱 Rettung wurde per Handy abgeschlossen", time.time())
+                threading.Thread(target=reset_alarm, args=(None, "✅ Rettung abgeschlossen – System bereit!"), daemon=True).start()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -201,17 +207,17 @@ def send_alert(pid, lat, lon):
     if g.get("collect_training") and _HAS_STC:
         stc.label("ALARM", details=f"Person #{pid}, GPS={lat:.6f},{lon:.6f}")
 
-    # ── DROHNE PRE-TRIM (Trims sofort, TAKEOFF erst bei Bestätigung) ────────
-    sender = _drone._pico_sender
-    if sender is not None:
-        tc = g.get("drone_trim_counters", {})
-        for k in tc:
-            tc[k] = 0
-        with _lock:
-            g["drone_autonomous"] = True
-            g["drone_reached"]    = False
-            g["drone_nav_cmd"]    = ""
-        print("[DRONE] Trimmen gestartet – warte auf TAKEOFF-Bestätigung!")
+    # ── DROHNE PRE-TRIM: Nav-Thread sofort starten damit Trims gesendet werden ────
+    # Die Drohne richtet sich am Boden in die Zielrichtung aus, sodass sie beim
+    # TAKEOFF sofort korrekt losfliegt. Trim-Counter werden frisch zurückgesetzt
+    # damit das Budget für die echte Navigation voll verfügbar ist.
+    with _lock:
+        for k in g["drone_trim_counters"]:
+            g["drone_trim_counters"][k] = 0
+        g["drone_autonomous"] = True
+        g["drone_reached"]    = False
+        g["drone_nav_cmd"]    = ""
+    print("[DRONE] Pre-Trim gestartet – Drohne richtet sich aus, warte auf TAKEOFF-Bestätigung.")
     # ── ──────────────────────────────────────────────────────────────────────
 
     stream_url = f"http://{_get_local_ip()}:{STREAM_PORT}"
@@ -241,15 +247,19 @@ def confirm_rescue(cid=None):
     if g.get("collect_training") and _HAS_STC:
         stc.label("DROWNING_CONFIRMED", details=f"Person #{g.get('alarm_pid')}")
 
-    # ── DROHNE TAKEOFF (Trims laufen bereits seit ALARM) ────────────────────
-    sender = _drone._pico_sender
-    if sender is not None:
-        if g.get("drone_orientation_angle") is None:
-            print("[DRONE] FEHLER: Kein ArUco-Marker sichtbar – TAKEOFF abgebrochen!")
-            _log_event("SYSTEM_START", "Drohnen-TAKEOFF ABGEBROCHEN – keine ArUco-Orientierung!")
-        else:
-            sender.send("TAKEOFF")
-            print("[DRONE] TAKEOFF angefordert – Drohne hebt ab!")
+    # ── DROHNE TAKEOFF ──────────────────────────────────────────────────────────────────
+    # drone_autonomous läuft bereits seit ALARM (Pre-Trim). Hier nur TAKEOFF.
+    if g.get("auto_takeoff", True):
+        sender = _drone._pico_sender
+        if sender is not None:
+            if g.get("drone_orientation_angle") is None:
+                print("[DRONE] FEHLER: Kein ArUco-Marker sichtbar – TAKEOFF abgebrochen!")
+                _log_event("SYSTEM_START", "Drohnen-TAKEOFF ABGEBROCHEN – keine ArUco-Orientierung!")
+            else:
+                sender.send("TAKEOFF")
+                print("[DRONE] TAKEOFF angefordert – Drohne hebt ab!")
+    else:
+        print("[DRONE] Auto-Takeoff deaktiviert – Drohne bleibt am Boden.")
     # ── ──────────────────────────────────────────────────────────────────────
 
     if cid:
@@ -341,9 +351,15 @@ def tg_poller():
                         _tg_subscribers.add(cb_uid)
                         _save_tg_subscribers(_tg_subscribers)
                     d, cid = cb["data"], cb["id"]
-                    if   d == "ok":    confirm_rescue(cid)
-                    elif d == "false": reset_alarm(cid, "❌ Fehlalarm – System bereit.")
-                    elif d == "done":  reset_alarm(cid, "✅ Rettung abgeschlossen – System bereit!")
+                    if   d == "ok":
+                        g["tg_action_note"] = ("📱 Rettung wurde per Handy bestätigt", time.time())
+                        confirm_rescue(cid)
+                    elif d == "false":
+                        g["tg_action_note"] = ("📱 Fehlalarm wurde per Handy markiert", time.time())
+                        reset_alarm(cid, "❌ Fehlalarm – System bereit.")
+                    elif d == "done":
+                        g["tg_action_note"] = ("📱 Rettung wurde per Handy abgeschlossen", time.time())
+                        reset_alarm(cid, "✅ Rettung abgeschlossen – System bereit!")
                     elif d == "aware":
                         with _lock:
                             g["awareness_pending"] = False
@@ -467,6 +483,8 @@ def detection_loop():
 
     found_a_buf = deque(maxlen=5)
     found_b_buf = deque(maxlen=5)
+    aruco_lost_frames   = 0   # konsekutive Frames ohne ArUco-Erkennung
+    ARUCO_LOST_THRESHOLD = 5  # ab hier Position auf None setzen
 
     _grace        = {}       # tid → konsekutive Frames seit letzter Erkennung
     _GRACE_FRAMES = 20       # Frames Gnadenfrist bevor Counter/Marked gelöscht
@@ -495,7 +513,7 @@ def detection_loop():
             _yolo_skip = 0
             try:
                 _yolo_last = model.track(source=frame, persist=True,
-                                         conf=0.35, iou=0.45, verbose=False,
+                                         conf=0.25, iou=0.45, verbose=False,
                                          tracker=os.path.join(os.path.dirname(os.path.abspath(__file__)), "bytetrack.yaml"))
             except Exception:
                 time.sleep(0.02)
@@ -655,9 +673,9 @@ def detection_loop():
                     _grace.pop(old_tid, None)
                     _last_bbox.pop(old_tid, None)
                     g["counters"].pop(old_tid, None)
-                    if old_tid in g["marked"] and old_tid not in g["locked"]:
-                        g["marked"].discard(old_tid)
-                    if old_tid in g["notified"] and old_tid not in g["locked"]:
+                    # Markierte Personen NICHT aus marked entfernen – bleiben
+                    # markiert bis explizite Nutzer-Aktion (✅/❌)
+                    if old_tid in g["notified"] and old_tid not in g["locked"] and old_tid not in g["marked"]:
                         g["notified"].discard(old_tid)
             else:
                 _grace.pop(old_tid, None)  # wieder sichtbar → Gnadenfrist zurücksetzen
@@ -679,14 +697,21 @@ def detection_loop():
                         g["counters"][tid] = g["counters"].get(tid, 0) + 1
                         threshold = g["frames"] * g.get("person_sensitivity", {}).get(tid, 1.0)
                         if g["counters"][tid] >= threshold:
-                            g["marked"].add(tid)
+                            _dc = g.get("dismissed_cooldown", {})
+                            if tid in _dc and time.time() < _dc[tid]:
+                                # Person wurde als Fehlalarm markiert – Cooldown läuft
+                                g["counters"][tid] = 0
+                            else:
+                                _dc.pop(tid, None)  # abgelaufenen Eintrag bereinigen
+                                g["marked"].add(tid)
                             trigger = False
-                            with _lock:
-                                if g["state"] == "NORMAL" and not g["alarm_pending"]:
-                                    g["state"]   = "ALARM"
-                                    g["alarms"] += 1
-                                    g["alert_cooldown_until"] = time.time() + 1.5
-                                    trigger = True
+                            if tid in g["marked"]:
+                                with _lock:
+                                    if g["state"] == "NORMAL" and not g["alarm_pending"]:
+                                        g["state"]   = "ALARM"
+                                        g["alarms"] += 1
+                                        g["alert_cooldown_until"] = time.time() + 1.5
+                                        trigger = True
                             if trigger:
                                 g["notified"].add(tid)
                                 la, lo = px2gps(new_pos[0], new_pos[1], fw, fh)
@@ -694,9 +719,12 @@ def detection_loop():
                                 threading.Thread(target=send_alert, args=(tid, la, lo), daemon=True).start()
                                 threading.Thread(target=alarm_sound, daemon=True).start()
                     else:
-                        g["counters"][tid] = 0
-                        if tid in g["marked"]   and tid not in g["locked"]: g["marked"].discard(tid)
-                        if tid in g["notified"] and tid not in g["locked"]: g["notified"].discard(tid)
+                        # Nur Counter zurücksetzen; als ertrinkend markierte Personen
+                        # bleiben IMMER markiert bis explizite Nutzer-Aktion (✅/❌)
+                        if tid not in g["marked"]:
+                            g["counters"][tid] = 0
+                        if tid in g["notified"] and tid not in g["locked"] and tid not in g["marked"]:
+                            g["notified"].discard(tid)
             except Exception:
                 traceback.print_exc()
 
@@ -736,14 +764,22 @@ def detection_loop():
                                    corner_pts[1, 1] - corner_pts[2, 1])
                     marker_pixel_size = max(d01, d12)
 
-                    # Orientierungs-EMA
-                    prev_angle = g.get("drone_orientation_angle")
-                    if prev_angle is None:
+                    # Orientierung nur einmalig beim ersten Erkennen setzen (dann eingefroren)
+                    if g.get("drone_orientation_angle") is None:
                         g["drone_orientation_angle"] = current_marker_angle
-                        print(f"[ARUCO] Orientierung gesetzt: {np.degrees(current_marker_angle):.1f}°")
-                    else:
-                        diff = angle_diff(current_marker_angle, prev_angle)
-                        g["drone_orientation_angle"] = angle_wrap(prev_angle + ORIENT_EMA_ALPHA * diff)
+                        print(f"[ARUCO] Orientierung gesetzt (einmalig): {np.degrees(current_marker_angle):.1f}°")
+
+                    # NEU: Anker-Offset-Infrastruktur wie Ideal (aktuell shift_px=0)
+                    corner_pts_off = c.reshape((4, 2))
+                    top_mid_x_off = (corner_pts_off[0, 0] + corner_pts_off[1, 0]) / 2.0
+                    top_mid_y_off = (corner_pts_off[0, 1] + corner_pts_off[1, 1]) / 2.0
+                    shift_px = 0.0  # kann später angepasst werden
+                    vx_off = top_mid_x_off - mcx
+                    vy_off = top_mid_y_off - mcy
+                    vlen_off = np.hypot(vx_off, vy_off)
+                    if vlen_off != 0.0:
+                        found_a_raw = (int(mcx + (vx_off / vlen_off) * shift_px),
+                                       int(mcy + (vy_off / vlen_off) * shift_px))
 
                     g["drone_marker_pixel_size"] = marker_pixel_size
 
@@ -759,8 +795,15 @@ def detection_loop():
                     break
 
         # Glättung ArUco-Position
+        g["drone_aruco_visible"] = (found_a_raw is not None)  # aktueller Frame – kein Buffer-Lag
         if found_a_raw is not None:
             found_a_buf.append(found_a_raw)
+            aruco_lost_frames = 0
+        else:
+            aruco_lost_frames += 1
+            if aruco_lost_frames >= ARUCO_LOST_THRESHOLD:
+                # Puffer leeren → Position wird None → Nav-Thread sendet STOP
+                found_a_buf.clear()
         smoothed_a = median_point(found_a_buf) if found_a_buf else None
         g["drone_aruco_pos"] = smoothed_a
 
@@ -812,9 +855,23 @@ def detection_loop():
         # Korridor zeichnen
         if corridor_points is not None:
             start, end = corridor_points
-            cv2.line(frame, start, end, (255, 255, 0), 3)
+            cv2.line(frame, start, end, (255, 255, 0), 1)
+            # Korridorgrenzen (parallele Linien) wie Ideal
+            sx, sy = start
+            ex, ey = end
+            vx_c = ex - sx
+            vy_c = ey - sy
+            vlen_c = np.hypot(vx_c, vy_c)
+            if vlen_c > 0.0:
+                px_c = -vy_c / vlen_c
+                py_c = vx_c / vlen_c
+                from config import CORRIDOR_HALF_WIDTH as _CHW
+                offx = int(px_c * _CHW)
+                offy = int(py_c * _CHW)
+                cv2.line(frame, (sx + offx, sy + offy), (ex + offx, ey + offy), (0, 255, 255), 2)
+                cv2.line(frame, (sx - offx, sy - offy), (ex - offx, ey - offy), (0, 255, 255), 2)
             cv2.putText(frame, "KORRIDOR", (start[0] + 10, start[1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
         # Drohnenpfad zeichnen
         if len(drone_path) > 1:
@@ -837,5 +894,8 @@ def detection_loop():
                         (10, fh - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
         g["frame"] = frame.copy()
+
+        # NEU: Frame-Sequenz inkrementieren → Nav-Thread navigiert nur bei neuem Frame
+        g["drone_frame_seq"] = g.get("drone_frame_seq", 0) + 1
 
     cam.release()

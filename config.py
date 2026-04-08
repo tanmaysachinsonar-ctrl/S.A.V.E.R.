@@ -24,15 +24,20 @@ except ImportError:
     _HAS_WINSOUND = False
 
 # ── Trainingsdaten-Collector (optional) ───────────────────────────────────────
+_HAS_STC = False
 try:
     # SAVER_SPLIT/ liegt in Programming/ → zwei Ebenen hoch = 2025_26/
-    _parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+    _parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     if _parent_dir not in sys.path:
         sys.path.insert(0, _parent_dir)
     import saver_training_collector as stc
     _HAS_STC = True
+except (ImportError, ModuleNotFoundError):
+    _HAS_STC = False
 except Exception:
     _HAS_STC = False
+
+if not _HAS_STC:
     class stc:  # Dummy
         @staticmethod
         def init(*a, **kw): pass
@@ -41,7 +46,7 @@ except Exception:
         @staticmethod
         def label(*a, **kw): pass
         @staticmethod
-        def stop(*a, **kw): pass
+        def stop(*a, **kw): pass 
 
 # Basis-Verzeichnis: Programming/ (eine Ebene über SAVER_SPLIT/)
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -49,26 +54,31 @@ _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # ═══════════════════════════════════════════════════════════════════════════════
 # ─── DROHNEN-KONFIG ───────────────────────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
-PICO_IP   = "192.168.43.21"
+PICO_IP   = "192.168.43.21" 
 PICO_PORT = 12345
 
 ARUCO_DICT_NAME      = "DICT_4X4_50"
 MARKER_ID            = 23
 DEADZONE_PIXELS      = 20
-TARGET_REACHED_DIST  = 100
-COMMAND_INTERVAL     = 0.5
+TARGET_REACHED_DIST  = 120
+COMMAND_INTERVAL     = 0.2   # Sekunden zwischen Nav-Befehlen (kleiner = schnellere Beschleunigung/Reaktion, war 0.5)
 PIXELS_MIN_MARKER    = 32
 
 SLOWDOWN_RADIUS = int(TARGET_REACHED_DIST * 5)
-SLOWDOWN_TRIMS  = 6
+# ALT: SLOWDOWN_TRIMS  = 6
+SLOWDOWN_TRIMS  = 2                      # Trims in der Slowdown-Zone vor STOP
 
 INVERT_LATERAL               = False
 SOCKET_CONNECT_TIMEOUT       = 6.0
 SOCKET_RECV_TIMEOUT          = 1.0
 ORIENTATION_UPDATE_RADIUS    = int(TARGET_REACHED_DIST * 2.0)
 ORIENT_EMA_ALPHA             = 0.25
-MAX_TRIM_COUNT               = 15
-CORRIDOR_HALF_WIDTH          = 70
+# ALT: MAX_TRIM_COUNT               = 50
+MAX_TRIM_COUNT               = 29       # wie Ideal (AUTONOME DRONE)
+CORRIDOR_HALF_WIDTH          = 90
+CORRIDOR_CENTERING_GAIN      = 0.5    # Wie stark die Zentrierung das Ziel verschiebt (0=aus, 1=voll)
+ARUCO_NAV_LOST_TOLERANCE     = 50  # ≈2s bei ~25fps – Navigation läuft mit Bufferwerten weiter
+ARUCO_BRAKE_TRIMS            = 6   # Gegentrim-Schritte zum sanften Abbremsen bevor voller Stop
 PRIORITIZE_LATERAL           = True
 PRIORITIZE_LATERAL_THRESHOLD = 1.2
 PRIORITIZE_BY_ANGLE          = True
@@ -146,6 +156,8 @@ g = dict(
     person_sensitivity={},
     bboxes={},
     collect_training=False,
+    auto_takeoff=True,       # Drohne startet automatisch bei Rettungsbestätigung
+    dismissed_cooldown={},   # pid → expiry timestamp (no re-alarm during cooldown)
     # Drohnen-Status
     drone_autonomous=False,
     drone_orientation_angle=None,
@@ -156,6 +168,8 @@ g = dict(
     drone_reached=False,
     drone_nav_cmd="",
     drone_marker_pixel_size=None,
+    drone_frame_seq=0,           # Frame-Sequenznummer – backend inkrementiert, nav-thread wartet auf neuen Frame
+    drone_aruco_visible=False,   # True nur wenn Marker im AKTUELLEN Frame erkannt – verhindert Navigation mit veralteten Buffer-Positionen
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -259,6 +273,28 @@ def point_in_corridor(pt, a, b, half_width):
     dist, t = point_to_segment_distance(pt, a, b)
     return dist <= half_width and 0.0 <= t <= 1.0
 
+def corridor_correction_vector(pt, a, b, half_width):
+    """Gibt (cx, cy) zurück – Pixel-Vektor der Drohne Richtung Korridormitte schiebt.
+    Stärke skaliert linear: 0 in der Mitte, voll am Rand."""
+    px, py = pt
+    ax, ay = a
+    bx, by = b
+    vx, vy = bx - ax, by - ay
+    l2 = vx*vx + vy*vy
+    if l2 == 0:
+        return 0.0, 0.0
+    t = max(0.0, min(1.0, ((px - ax)*vx + (py - ay)*vy) / l2))
+    # Nächster Punkt auf der Mittellinie
+    cx, cy = ax + t*vx, ay + t*vy
+    # Vektor von Drohne → Mittellinie
+    dx, dy = cx - px, cy - py
+    perp_dist = np.hypot(dx, dy)
+    if perp_dist < 1.0:
+        return 0.0, 0.0
+    # Linearer Faktor: 0 in der Mitte, 1 am Korridorrand
+    strength = min(1.0, perp_dist / max(1.0, half_width))
+    return dx * strength, dy * strength
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ─── KONFIG-PERSISTENZ ────────────────────────────────────────────────────────
@@ -334,7 +370,7 @@ def px2gps(x, y, w, h):
     )
 
 def alarm_sound():
-    alarm_path = r"G:\Meine Ablage\Jugend Forscht\S.A.V.E.R\2025_26\Programming\SAVER_SPLIT\alarm.mp3"
+    alarm_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alarm.mp3")
     
     # Versuche pygame.mixer (beste Option für zuverlässige Wiedergabe)
     try:

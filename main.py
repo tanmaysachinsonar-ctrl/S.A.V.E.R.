@@ -50,6 +50,31 @@ _EVT_STYLE = {
 }
 
 
+def _center_toplevel(win, parent=None):
+    """Zentriert ein Toplevel auf dem Elternfenster (oder Bildschirm)."""
+    win.update_idletasks()
+    w = win.winfo_width()
+    h = win.winfo_height()
+    if w <= 1:  # Fallback: Größe aus geometry-String lesen
+        geo = win.geometry()
+        try:
+            w = int(geo.split("x")[0])
+            h = int(geo.split("x")[1].split("+")[0])
+        except Exception:
+            return
+    if parent is not None:
+        px = parent.winfo_rootx()
+        py = parent.winfo_rooty()
+        pw = parent.winfo_width()
+        ph = parent.winfo_height()
+        x = px + (pw - w) // 2
+        y = py + (ph - h) // 2
+    else:
+        x = (win.winfo_screenwidth()  - w) // 2
+        y = (win.winfo_screenheight() - h) // 2
+    win.geometry(f"+{max(0, x)}+{max(0, y)}")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # ─── LOGBUCH ──────────────────────────────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -61,6 +86,7 @@ class LogbookViewer(ctk.CTkToplevel):
         self.configure(fg_color=BG)
         self.transient(parent)
         self.grab_set()
+        _center_toplevel(self, parent)
         self._entries = _load_log()
 
         header = ctk.CTkFrame(self, height=56, fg_color=PANEL)
@@ -233,6 +259,7 @@ class LogbookViewer(ctk.CTkToplevel):
         confirm.configure(fg_color=BG)
         confirm.transient(self)
         confirm.grab_set()
+        _center_toplevel(confirm, self)
         ctk.CTkLabel(confirm, text="⚠  Gesamtes Logbuch löschen?",
                      font=ctk.CTkFont("Segoe UI", 16, "bold"), text_color="#ff8800").pack(pady=(20, 4))
         ctk.CTkLabel(confirm, text="Diese Aktion kann nicht rückgängig gemacht werden.",
@@ -266,6 +293,7 @@ class StatsDashboard(ctk.CTkToplevel):
         self.configure(fg_color=BG)
         self.transient(parent)
         self.grab_set()
+        _center_toplevel(self, parent)
         self._all_entries = _load_log()
 
         hdr = ctk.CTkFrame(self, height=56, fg_color=PANEL)
@@ -407,6 +435,7 @@ class StatsDashboard(ctk.CTkToplevel):
         confirm.configure(fg_color=BG)
         confirm.transient(self)
         confirm.grab_set()
+        _center_toplevel(confirm, self)
         ctk.CTkLabel(confirm, text="⚠  Gesamte Statistik löschen?",
                      font=ctk.CTkFont("Segoe UI", 16, "bold"), text_color="#ff8800").pack(pady=(20, 4))
         ctk.CTkLabel(confirm, text="Diese Aktion kann nicht rückgängig gemacht werden.",
@@ -438,6 +467,7 @@ class ExclusionZoneEditor(ctk.CTkToplevel):
         self.configure(fg_color=BG)
         self.transient(parent)
         self.grab_set()
+        _center_toplevel(self, parent)
         self._zones    = [list(z) for z in (zones or [])]
         self._on_save  = on_save
         self._drawing  = False
@@ -608,12 +638,14 @@ class SAVERApp(ctk.CTk):
             "lat1": self._lat1.get(), "lon1": self._lon1.get(),
             "lat2": self._lat2.get(), "lon2": self._lon2.get(),
             "exclusion_zones": [list(z) for z in self._exclusion_zones],
+            "auto_takeoff": self._auto_takeoff_v.get(),
         }
 
     def _apply_cfg(self, cfg):
         self._cam_v.set(cfg.get("cam", "Hauptkamera"))
         self._sens_v.set(cfg.get("sens", "Mittel"))
         self._gps_v.set(cfg.get("use_gps", False))
+        self._auto_takeoff_v.set(cfg.get("auto_takeoff", True))
         for key in ("lat1", "lon1", "lat2", "lon2"):
             entry = getattr(self, f"_{key}")
             entry.delete(0, "end")
@@ -724,6 +756,7 @@ class SAVERApp(ctk.CTk):
                      distT=p["distT"], frames=p["frames"], radius=p["radius"],
                      running=True, t0=time.time(), state="NORMAL",
                      alarms=0, persons=0, use_gps=use_gps,
+                     auto_takeoff=cfg.get("auto_takeoff", True),
                      exclusion_zones=self._exclusion_zones)
         self._start_all_threads()
         _log_event("SYSTEM_START", f"Schnellstart – {cfg.get('cam','Hauptkamera')}, {cfg.get('sens','Mittel')}")
@@ -786,6 +819,10 @@ class SAVERApp(ctk.CTk):
         self._collect_v = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(inner, text="Trainingsdaten sammeln (Pose-Keypoints für KI)",
                         variable=self._collect_v, font=ctk.CTkFont("Segoe UI", 13),
+                        text_color="#778899").pack(anchor="w", pady=(0, 8))
+        self._auto_takeoff_v = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(inner, text="Auto-Takeoff: Drohne startet automatisch bei Rettungsbestätigung",
+                        variable=self._auto_takeoff_v, font=ctk.CTkFont("Segoe UI", 13),
                         text_color="#778899").pack(anchor="w", pady=(0, 8))
         self._gps_frame = ctk.CTkFrame(inner, fg_color="transparent")
         for lbl, attr_lat, attr_lon in [("Oben-Links","_lat1","_lon1"),("Unten-Rechts","_lat2","_lon2")]:
@@ -862,6 +899,7 @@ class SAVERApp(ctk.CTk):
                      running=True, t0=time.time(), state="NORMAL",
                      alarms=0, persons=0, use_gps=use_gps,
                      collect_training=self._collect_v.get(),
+                     auto_takeoff=self._auto_takeoff_v.get(),
                      exclusion_zones=[tuple(z) for z in self._exclusion_zones])
         if g["collect_training"] and _HAS_STC:
             stc.init(camera=self._cam_v.get(), sensitivity=self._sens_v.get())
@@ -892,6 +930,7 @@ class SAVERApp(ctk.CTk):
         self._settings_win.configure(fg_color=BG)
         self._settings_win.transient(self)
         self._settings_win.grab_set()
+        _center_toplevel(self._settings_win, self)
         self._settings_win.protocol("WM_DELETE_WINDOW", self._close_settings)
         wrap = ctk.CTkFrame(self._settings_win, fg_color="transparent")
         wrap.pack(fill="both", expand=True, padx=24, pady=20)
@@ -1151,15 +1190,27 @@ class SAVERApp(ctk.CTk):
     # ── UPDATE LOOP ───────────────────────────────────────────────────────────
     def _update(self):
         try:
+            self._tick = getattr(self, "_tick", 0) + 1
             state = g["state"]
-            self._clock.configure(text=time.strftime("%H:%M:%S"))
-            self._s_persons.configure(text=str(g["persons"]))
-            self._s_alarms.configure(text=str(g["alarms"]))
 
-            # Video-Frame anzeigen
+            # Uhr – jeder Tick
+            self._clock.configure(text=time.strftime("%H:%M:%S"))
+
+            # Personen / Alarme – nur bei Änderung
+            persons_now = g["persons"]
+            alarms_now  = g["alarms"]
+            if persons_now != getattr(self, "_c_persons", None):
+                self._c_persons = persons_now
+                self._s_persons.configure(text=str(persons_now))
+            if alarms_now != getattr(self, "_c_alarms", None):
+                self._c_alarms = alarms_now
+                self._s_alarms.configure(text=str(alarms_now))
+
+            # Video-Frame – nur wenn neuer Frame vorhanden
             try:
                 fr = g.get("frame")
-                if fr is not None:
+                if fr is not None and id(fr) != getattr(self, "_c_frame_id", None):
+                    self._c_frame_id = id(fr)
                     self._vid_ph.place_forget()
                     vw = self._vid.winfo_width()
                     vh = self._vid.winfo_height()
@@ -1175,37 +1226,49 @@ class SAVERApp(ctk.CTk):
             except Exception:
                 pass
 
-            # Drohnen-Status aktualisieren
-            try:
-                sender      = _drone._pico_sender
-                pico_status = sender.get_status() if sender else "–"
-                self._s_pico.configure(
-                    text=pico_status[:22],
-                    text_color=GREEN if "Verbunden" in pico_status else "#888888")
-                is_auto = g.get("drone_autonomous", False)
-                reached = g.get("drone_reached", False)
-                if reached:
-                    drone_mode_txt, drone_mode_col = "ZIEL ERREICHT", GREEN
-                elif is_auto:
-                    drone_mode_txt, drone_mode_col = "AUTONOM ✈", ORANGE
-                else:
-                    drone_mode_txt, drone_mode_col = "BEREIT", "#6677aa"
-                self._s_drone_mode.configure(text=drone_mode_txt, text_color=drone_mode_col)
-                aruco_pos = g.get("drone_aruco_pos")
-                aruco_ang = g.get("drone_orientation_angle")
-                if aruco_pos and aruco_ang is not None:
-                    self._s_aruco.configure(
-                        text=f"{aruco_pos[0]},{aruco_pos[1]} | {np.degrees(aruco_ang):.0f}°",
-                        text_color=GREEN)
-                else:
-                    self._s_aruco.configure(text="Nicht sichtbar", text_color=MUTED)
-                nav_cmd = g.get("drone_nav_cmd", "")
-                self._s_nav_cmd.configure(text=nav_cmd[:16] if nav_cmd else "–",
-                                           text_color=ORANGE if nav_cmd else MUTED)
-            except Exception:
-                pass
+            # Drohnen-Status – jeden 4. Tick (~120 ms) und nur bei Änderung
+            if self._tick % 4 == 0:
+                try:
+                    sender      = _drone._pico_sender
+                    pico_status = sender.get_status() if sender else "–"
+                    if pico_status != getattr(self, "_c_pico", None):
+                        self._c_pico = pico_status
+                        self._s_pico.configure(
+                            text=pico_status[:22],
+                            text_color=GREEN if "Verbunden" in pico_status else "#888888")
+                    is_auto = g.get("drone_autonomous", False)
+                    reached = g.get("drone_reached", False)
+                    if reached:
+                        _dmt, _dmc = "ZIEL ERREICHT", GREEN
+                    elif is_auto:
+                        _dmt, _dmc = "AUTONOM ✈", ORANGE
+                    else:
+                        _dmt, _dmc = "BEREIT", "#6677aa"
+                    if (_dmt, _dmc) != getattr(self, "_c_drone_mode", None):
+                        self._c_drone_mode = (_dmt, _dmc)
+                        self._s_drone_mode.configure(text=_dmt, text_color=_dmc)
+                    aruco_pos = g.get("drone_aruco_pos")
+                    aruco_ang = g.get("drone_orientation_angle")
+                    if aruco_pos and aruco_ang is not None:
+                        _at = f"{aruco_pos[0]},{aruco_pos[1]} | {np.degrees(aruco_ang):.0f}°"
+                        _ac = GREEN
+                    else:
+                        _at, _ac = "Nicht sichtbar", MUTED
+                    if _at != getattr(self, "_c_aruco", None):
+                        self._c_aruco = _at
+                        self._s_aruco.configure(text=_at, text_color=_ac)
+                    nav_cmd = g.get("drone_nav_cmd", "")
+                    _nt = nav_cmd[:16] if nav_cmd else "–"
+                    if _nt != getattr(self, "_c_nav", None):
+                        self._c_nav = _nt
+                        self._s_nav_cmd.configure(text=_nt,
+                                                   text_color=ORANGE if nav_cmd else MUTED)
+                except Exception:
+                    pass
 
-            self._update_person_overlays()
+            # Person-Overlays – jeden 2. Tick (~60 ms), flüssig genug für Tracking
+            if self._tick % 2 == 0:
+                self._update_person_overlays()
 
             # State-Wechsel
             if state != self._prev_state:
@@ -1216,7 +1279,6 @@ class SAVERApp(ctk.CTk):
 
             # Alarm-Blinken
             if state == "ALARM":
-                # Sicherstellen, dass Alarm-Buttons IMMER sichtbar sind
                 if not self._btn_yes.winfo_ismapped():
                     self._enter_alarm()
                 self._blink_counter += 1
@@ -1225,7 +1287,7 @@ class SAVERApp(ctk.CTk):
                     self.configure(fg_color="#1a0005" if self._blink else BG)
                     self._bot.configure(fg_color="#2a0008" if self._blink else "#1a0005")
 
-            # Sicherstellen, dass Rettung-Button IMMER sichtbar ist
+            # Rettung-Button immer sichtbar
             if state == "RESCUE":
                 if not self._btn_done.winfo_ismapped():
                     self._show_rescue()
@@ -1235,9 +1297,16 @@ class SAVERApp(ctk.CTk):
                 self._bot_txt.place(relx=0.5, rely=0.5, anchor="center")
                 self._bot_txt.configure(text="🔔  Bitte Anwesenheit bestätigen!", text_color=ORANGE)
                 self._btn_aware.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.5)
-            elif state == "NORMAL" and not g.get("awareness_pending"):
-                if not self._btn_yes.winfo_ismapped():
-                    pass
+
+            # Handy-Aktion anzeigen (5 Sek)
+            tg_note = g.get("tg_action_note")
+            if tg_note and state == "NORMAL":
+                note_text, note_time = tg_note
+                if time.time() - note_time < 5.0:
+                    self._bot_txt.place(relx=0.5, rely=0.5, anchor="center")
+                    self._bot_txt.configure(text=note_text, text_color=BLUE)
+                elif time.time() - note_time >= 5.0:
+                    g["tg_action_note"] = None
 
         except Exception:
             traceback.print_exc()
@@ -1302,7 +1371,7 @@ class SAVERApp(ctk.CTk):
         self._btn_yes.place_forget()
         self._btn_no.place_forget()
         self._btn_done.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.7)
-        self._clear_person_btns()
+        # Markierungs-Popups bleiben auch im RESCUE-State sichtbar
 
     # ── PERSON-OVERLAY-BUTTONS ────────────────────────────────────────────────
     def _update_person_overlays(self):
@@ -1311,7 +1380,7 @@ class SAVERApp(ctk.CTk):
         state  = g.get("state")
         fr     = g.get("frame")
         mold   = g.get("mold", {})
-        if state != "ALARM" or fr is None:
+        if state not in ("ALARM", "RESCUE") or fr is None:
             if self._person_btns: self._clear_person_btns()
             return
         fh_, fw_ = fr.shape[:2]
@@ -1345,7 +1414,15 @@ class SAVERApp(ctk.CTk):
             ax, ay = self._anchors[pid]
             px = x_off + int(ax*nw)
             py = y_off + int(ay*nh) - 70
-            py = max(64, py)
+            _PW, _PH = 114, 80   # ungefähre Panel-Größe (Breite, Höhe)
+            # Horizontal: bevorzugt zentriert über der Person, immer im Bild
+            bx = px - _PW // 2
+            bx = max(0, min(bx, self._vid_outer.winfo_width() - _PW))
+            # Vertikal: bevorzugt oberhalb, sonst unterhalb, immer im Bild
+            by = py
+            if by < 0:
+                by = y_off + int(ay*nh) + 10   # unterhalb der Person
+            by = max(0, min(by, self._vid_outer.winfo_height() - _PH))
             if pid not in self._person_btns:
                 panel = ctk.CTkFrame(self._vid_outer, fg_color="#0d0d22", corner_radius=10,
                                      border_width=2, border_color="#ff2233")
@@ -1362,7 +1439,7 @@ class SAVERApp(ctk.CTk):
                               font=ctk.CTkFont(size=16),
                               command=lambda p=pid: self._dismiss_person(p)).pack(side="left", padx=2)
                 self._person_btns[pid] = panel
-            self._person_btns[pid].place(x=px-55, y=py)
+            self._person_btns[pid].place(x=bx, y=by)
             self._person_btns[pid].lift()
 
     def _clear_person_btns(self):
@@ -1378,6 +1455,8 @@ class SAVERApp(ctk.CTk):
         g["alarm_pid"] = pid
         threading.Thread(target=backend.confirm_rescue, daemon=True).start()
 
+    _DISMISS_COOLDOWN_SEC = 30  # Sekunden Cooldown nach Fehlalarm-Markierung
+
     def _dismiss_person(self, pid):
         if self._sens_popup is not None:
             self._sens_popup.destroy()
@@ -1386,6 +1465,7 @@ class SAVERApp(ctk.CTk):
             g["marked"].discard(pid)
             g["counters"].pop(pid, None)
             g["notified"].discard(pid)
+            g.setdefault("dismissed_cooldown", {})[pid] = time.time() + self._DISMISS_COOLDOWN_SEC
         if pid in self._person_btns:
             self._person_btns[pid].destroy()
             del self._person_btns[pid]
@@ -1404,7 +1484,7 @@ class SAVERApp(ctk.CTk):
                     "text": "❌ Fehlalarm – System bereit."})
 
     # ── VIDEO-KLICK → PERSON-SENSITIVITY ─────────────────────────────────────
-    def _on_vid_click(self, event):
+    def _on_vid_click(self, event): 
         if self._sens_popup is not None:
             self._sens_popup.destroy()
             self._sens_popup = None

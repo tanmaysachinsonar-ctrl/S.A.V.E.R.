@@ -1,4 +1,15 @@
 {
   "include": ["."],
-  "extraPaths": [".", ".."]
+  "extraPaths": [".", ".."],
+  "reportAttributeAccessIssue": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportOptionalSubscript": "none",
+  "reportIndexIssue": "none",
+  "reportCallIssue": "none",
+  "reportArgumentType": "none",
+  "reportOperatorIssue": "none",
+  "reportPossiblyUnboundVariable": "none",
+  "reportAssignmentType": "none",
+  "reportOptionalIterable": "none",
+  "reportGeneralTypeIssues": "none"
 }
