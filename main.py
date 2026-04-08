@@ -1133,11 +1133,12 @@ class SAVERApp(ctk.CTk):
         tg_row.pack(fill="x", pady=(10, 0))
         ctk.CTkLabel(tg_row, text="Telegram  ✓", font=ctk.CTkFont("Segoe UI", 11), text_color="#3a6644").pack(side="left")
 
-        # BOTTOM BAR
+        # BOTTOM BAR – von unten packen BEVOR content seine Größe berechnet,
+        # damit das Kamerabild die Bottom-Bar nicht aus dem Fenster drückt.
         self._bot = ctk.CTkFrame(self, height=90, corner_radius=0, fg_color=PANEL)
-        ctk.CTkFrame(self, height=1, corner_radius=0, fg_color="#1a1a3a").pack(fill="x")
-        self._bot.pack(fill="x")
+        self._bot.pack(side="bottom", fill="x")
         self._bot.pack_propagate(False)
+        ctk.CTkFrame(self, height=1, corner_radius=0, fg_color="#1a1a3a").pack(side="bottom", fill="x")
 
         self._bot_txt = ctk.CTkLabel(self._bot,
             text="✅  System aktiv  –  Alle Personen werden überwacht",
