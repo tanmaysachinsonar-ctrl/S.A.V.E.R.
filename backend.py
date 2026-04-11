@@ -14,7 +14,7 @@ import traceback
 import numpy as np
 import requests
 from collections import deque
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, BaseHTTPRequestHandler, ThreadingHTTPServer
 from ultralytics import YOLO
 
 import drone as _drone
@@ -23,110 +23,112 @@ from config import (
     ARUCO_DICT_NAME, MARKER_ID, ORIENT_EMA_ALPHA,
     TARGET_REACHED_DIST, SLOWDOWN_RADIUS, PIXELS_MIN_MARKER,
     TELEGRAM_API, STREAM_PORT,
+    PICO_IP, PICO_PORT, SENSITIVITY,
     AWARENESS_INTERVAL_SEC, AWARENESS_TIMEOUT_SEC, ALARM_AUTO_DISPATCH_SEC,
     _tg_subscribers, _tg_pending, TG_PASSWORD,
     _log_event, _load_log, _save_log, _log_lock, _save_tg_subscribers,
+    _load_config, _save_config,
     _get_local_ip, _in_exclusion_zone, px2gps, alarm_sound,
     get_aruco_detector, detect_aruco, marker_center_and_angle,
     angle_wrap, angle_diff, median_point,
     _HAS_STC, stc,
 )
 
+# ── Web-UI HTML laden ─────────────────────────────────────────────────────────
+_WEB_UI_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_ui.html")
+def _load_web_ui():
+    try:
+        with open(_WEB_UI_PATH, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return "<h1>Fehler: web_ui.html nicht gefunden</h1>"
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ─── LIVE STREAM ──────────────────────────────────────────────────────────────
+# ─── SYSTEM START / STOP ──────────────────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
-_STREAM_HTML = '''<!DOCTYPE html><html><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>S.A.V.E.R Live</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#08081a;font-family:'Segoe UI',sans-serif;color:#ccc;
-     display:flex;flex-direction:column;height:100vh;overflow:hidden}
-#top{background:#0d0d22;padding:10px 16px;display:flex;align-items:center;
-     border-bottom:1px solid #1a1a3a}
-#top h1{font-size:18px;color:#0088ff;flex:1}
-#badge{font-size:13px;font-weight:bold;padding:4px 14px;border-radius:10px}
-#vid-wrap{flex:1;display:flex;align-items:center;justify-content:center;
-          background:#030310;overflow:hidden;position:relative}
-#vid-wrap img{max-width:100%;max-height:100%}
-#banner{display:none;position:absolute;top:0;left:0;right:0;
-        background:#2a0000;padding:12px;text-align:center;
-        font-size:16px;font-weight:bold;color:#ff3333;z-index:5}
-#bot{background:#0d0d22;padding:12px 16px;text-align:center;
-     border-top:1px solid #1a1a3a;min-height:70px;display:flex;
-     align-items:center;justify-content:center;gap:12px}
-.btn{border:none;color:#fff;font-size:16px;font-weight:bold;
-     padding:14px 24px;border-radius:14px;cursor:pointer;flex:1;
-     max-width:320px;transition:opacity .2s}
-.btn:active{opacity:.7}
-.btn-green{background:#005522}
-.btn-red{background:#660000}
-.btn-orange{background:#775500}
-#bot-text{font-size:15px;color:#00cc66}
-.hide{display:none!important}
-</style></head><body>
-<div id="top">
-  <h1>&#127754; S.A.V.E.R</h1>
-  <span id="badge">&#9679; BEREIT</span>
-</div>
-<div id="vid-wrap">
-  <div id="banner"></div>
-  <img src="/stream">
-</div>
-<div id="bot">
-  <span id="bot-text">&#9989; System aktiv &#8211; Alle Personen werden &#252;berwacht</span>
-  <button id="btn-yes" class="btn btn-green hide"
-          onclick="action('confirm')">&#9989; RETTUNG BEST&#196;TIGEN</button>
-  <button id="btn-no" class="btn btn-red hide"
-          onclick="action('false_alarm')">&#10060; FEHLALARM</button>
-  <button id="btn-done" class="btn btn-orange hide"
-          onclick="action('done')">&#127946; RETTUNG ABGESCHLOSSEN</button>
-</div>
-<script>
-function action(a){fetch('/action?do='+a).then(r=>r.json()).then(d=>{});}
-function poll(){
-  fetch('/status').then(r=>r.json()).then(d=>{
-    const badge=document.getElementById('badge');
-    const banner=document.getElementById('banner');
-    const botText=document.getElementById('bot-text');
-    const btnYes=document.getElementById('btn-yes');
-    const btnNo=document.getElementById('btn-no');
-    const btnDone=document.getElementById('btn-done');
-    const bot=document.getElementById('bot');
-    if(d.state==='NORMAL'){
-      badge.textContent='&#9679; BEREIT';badge.style.cssText='color:#00cc66;background:#0a2218';
-      banner.style.display='none';
-      botText.className='';botText.textContent='&#9989; System aktiv';botText.style.color='#00cc66';
-      btnYes.className='btn btn-green hide';btnNo.className='btn btn-red hide';btnDone.className='btn btn-orange hide';
-      bot.style.background='#0d0d22';document.body.style.background='#08081a';
-    }else if(d.state==='ALARM'){
-      badge.textContent='&#128680; ALARM';badge.style.cssText='color:#fff;background:#550000';
-      banner.style.display='block';banner.textContent='&#128680; ALARM &#8211; Person #'+d.pid+' &#8211; SOFORT HANDELN!';
-      botText.className='hide';btnYes.className='btn btn-green';btnNo.className='btn btn-red';btnDone.className='btn btn-orange hide';
-      bot.style.background='#1a0005';
-    }else if(d.state==='RESCUE'){
-      badge.textContent='&#127946; RETTUNG L&#196;UFT';badge.style.cssText='color:#fff;background:#553300';
-      banner.style.display='block';banner.textContent='&#127946; RETTUNG L&#196;UFT &#8211; Druck unten wenn Person gerettet';
-      banner.style.background='#1e1000';banner.style.color='#ff8800';
-      botText.className='hide';btnYes.className='btn btn-green hide';btnNo.className='btn btn-red hide';btnDone.className='btn btn-orange';
-      bot.style.background='#1a1000';
-    }
-  }).catch(()=>{});
-}
-setInterval(poll,800);poll();
-</script></body></html>'''
+def start_system(cfg):
+    """Start all backend threads with given config dict."""
+    cam_map = {"Hauptkamera": 0, "Kamera 2": 1, "Kamera 3": 2}
+    sens_name = cfg.get("sens", "Mittel")
+    p = SENSITIVITY.get(sens_name, SENSITIVITY["Mittel"])
+    with _lock:
+        g.update(
+            lat1=float(cfg.get("lat1", 0)), lon1=float(cfg.get("lon1", 0)),
+            lat2=float(cfg.get("lat2", 0)), lon2=float(cfg.get("lon2", 0)),
+            cam=cam_map.get(cfg.get("cam", "Hauptkamera"), 0),
+            distT=p["distT"], frames=p["frames"], radius=p["radius"],
+            running=True, t0=time.time(), state="NORMAL",
+            alarms=0, persons=0,
+            use_gps=cfg.get("use_gps", False),
+            collect_training=cfg.get("collect_training", False),
+            auto_takeoff=cfg.get("auto_takeoff", True),
+            exclusion_zones=[tuple(z) for z in cfg.get("exclusion_zones", [])],
+        )
+    g["_sensitivity_name"] = sens_name
+    if g["collect_training"] and _HAS_STC:
+        stc.init(camera=cfg.get("cam"), sensitivity=sens_name)
+    if _drone._pico_sender is None:
+        pico_ip = cfg.get("pico_ip", PICO_IP)
+        _drone._pico_sender = _drone.PicoSender(pico_ip, PICO_PORT)
+        print(f"[PICO] PicoSender gestartet → {pico_ip}:{PICO_PORT}")
+    threading.Thread(target=detection_loop,   daemon=True).start()
+    threading.Thread(target=_drone.drone_nav_loop, daemon=True).start()
+    threading.Thread(target=tg_poller,         daemon=True).start()
+    threading.Thread(target=escalation_loop,   daemon=True).start()
+    _save_config(cfg)
+    _log_event("SYSTEM_START", f"System gestartet – {cfg.get('cam')}, {sens_name}")
 
+
+def stop_system():
+    """Stop the system gracefully."""
+    if g.get("running"):
+        _log_event("SYSTEM_STOP", "System beendet")
+    g["running"] = False
+    if _drone._pico_sender:
+        _drone._pico_sender.clear_queue()
+        _drone._pico_sender.send("STOP")
+    if g.get("collect_training") and _HAS_STC:
+        stc.stop()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ─── HTTP SERVER (Web-UI + API + MJPEG) ───────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class _MJPEGHandler(BaseHTTPRequestHandler):
+
+    # ── Hilfs-Methoden ────────────────────────────────────────────────────────
+    def _json_response(self, data, code=200):
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(json.dumps(data, default=str).encode())
+
+    def _read_json_body(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            return json.loads(body) if body else {}
+        except Exception:
+            return {}
+
+    # ── GET ────────────────────────────────────────────────────────────────────
     def do_GET(self):
-        if self.path == "/stream":
+        path = self.path.split("?")[0]
+
+        if path == "/stream":
             self.send_response(200)
             self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             try:
+                # Warte bis System läuft (max 30s)
+                for _ in range(300):
+                    if g.get("running"):
+                        break
+                    time.sleep(0.1)
                 while g.get("running"):
                     fr = g.get("frame")
                     if fr is not None:
@@ -141,17 +143,102 @@ class _MJPEGHandler(BaseHTTPRequestHandler):
                     time.sleep(0.1)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
-        elif self.path == "/status":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Cache-Control", "no-cache")
+
+        elif path == "/api/status":
+            sender = _drone._pico_sender
+            pico_status = sender.get_status() if sender else "–"
+            aruco_pos = g.get("drone_aruco_pos")
+            orient = g.get("drone_orientation_angle")
+            fr = g.get("frame")
+            frame_size = [int(fr.shape[1]), int(fr.shape[0])] if fr is not None else [1, 1]
+            tg_note = g.get("tg_action_note")
+            tg_text = None
+            if tg_note:
+                note_text, note_time = tg_note
+                if time.time() - note_time < 5.0:
+                    tg_text = note_text
+                else:
+                    g["tg_action_note"] = None
+            mold_out = {}
+            for tid, pos in g.get("mold", {}).items():
+                mold_out[str(tid)] = [pos[0], pos[1]]
+            self._json_response({
+                "state":       g.get("state", "SETUP"),
+                "running":     g.get("running", False),
+                "persons":     g.get("persons", 0),
+                "alarms":      g.get("alarms", 0),
+                "sensitivity": g.get("_sensitivity_name", "Mittel"),
+                "clock":       time.strftime("%H:%M:%S"),
+                "use_gps":     g.get("use_gps", False),
+                "alarm_pid":   g.get("alarm_pid"),
+                "alarm_lat":   g.get("alarm_lat", 0.0),
+                "alarm_lon":   g.get("alarm_lon", 0.0),
+                "awareness_pending": g.get("awareness_pending", False),
+                "awareness_alarm":   g.get("awareness_alarm", False),
+                "tg_action_note":    tg_text,
+                "marked":  list(g.get("marked", set())),
+                "locked":  list(g.get("locked", set())),
+                "mold":    mold_out,
+                "frame_size": frame_size,
+                "drone": {
+                    "pico":              pico_status,
+                    "autonomous":        g.get("drone_autonomous", False),
+                    "reached":           g.get("drone_reached", False),
+                    "aruco_pos":         list(aruco_pos) if aruco_pos else None,
+                    "orientation_angle": float(np.degrees(orient)) if orient is not None else None,
+                    "nav_cmd":           g.get("drone_nav_cmd", ""),
+                    "aruco_visible":     g.get("drone_aruco_visible", False),
+                },
+            })
+
+        elif path == "/api/config":
+            cfg = _load_config()
+            if cfg is None:
+                cfg = {}
+            if "pico_ip" not in cfg:
+                cfg["pico_ip"] = PICO_IP
+            self._json_response(cfg)
+
+        elif path == "/api/log":
+            with _log_lock:
+                entries = _load_log()
+            self._json_response(entries)
+
+        elif path.startswith("/api/snapshot"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            cam_idx = int(qs.get("cam", [g.get("cam", 0)])[0])
+            # Versuche laufenden Frame
+            fr = g.get("frame")
+            if fr is not None:
+                ok, buf = cv2.imencode(".jpg", fr, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                if ok:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/jpeg")
+                    self.send_header("Cache-Control", "no-cache")
+                    self.end_headers()
+                    self.wfile.write(buf.tobytes())
+                    return
+            # Kein laufender Frame → direkt von Kamera
+            try:
+                cap = cv2.VideoCapture(cam_idx)
+                ret, frame = cap.read()
+                cap.release()
+                if ret:
+                    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    if ok:
+                        self.send_response(200)
+                        self.send_header("Content-Type", "image/jpeg")
+                        self.end_headers()
+                        self.wfile.write(buf.tobytes())
+                        return
+            except Exception:
+                pass
+            self.send_response(404)
             self.end_headers()
-            self.wfile.write(json.dumps({
-                "state":   g.get("state", "NORMAL"),
-                "pid":     g.get("alarm_pid", "?"),
-                "persons": g.get("persons", 0),
-            }).encode())
-        elif self.path.startswith("/action"):
+
+        # Legacy Telegram action links (backward compat)
+        elif path.startswith("/action"):
             from urllib.parse import urlparse, parse_qs
             qs = parse_qs(urlparse(self.path).query)
             do = qs.get("do", [""])[0]
@@ -160,19 +247,181 @@ class _MJPEGHandler(BaseHTTPRequestHandler):
                 threading.Thread(target=confirm_rescue, daemon=True).start()
             elif do == "false_alarm":
                 g["tg_action_note"] = ("📱 Fehlalarm wurde per Handy markiert", time.time())
-                threading.Thread(target=reset_alarm, args=(None, "❌ Fehlalarm – System bereit."),            daemon=True).start()
+                threading.Thread(target=reset_alarm, args=(None, "❌ Fehlalarm – System bereit."), daemon=True).start()
             elif do == "done":
                 g["tg_action_note"] = ("📱 Rettung wurde per Handy abgeschlossen", time.time())
                 threading.Thread(target=reset_alarm, args=(None, "✅ Rettung abgeschlossen – System bereit!"), daemon=True).start()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"ok":true}')
+            self._json_response({"ok": True})
+
         else:
+            # Serve web UI (always reload for live editing)
+            html_bytes = _load_web_ui().encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html_bytes)))
+            self.send_header("Connection", "close")
             self.end_headers()
-            self.wfile.write(_STREAM_HTML.encode("utf-8"))
+            self.wfile.write(html_bytes)
+
+    # ── POST ──────────────────────────────────────────────────────────────────
+    def do_POST(self):
+        path = self.path.split("?")[0]
+        body = self._read_json_body()
+
+        if path == "/api/start":
+            if g.get("running"):
+                self._json_response({"ok": False, "error": "System läuft bereits"})
+                return
+            try:
+                start_system(body)
+                self._json_response({"ok": True})
+            except Exception as e:
+                self._json_response({"ok": False, "error": str(e)})
+
+        elif path == "/api/stop":
+            stop_system()
+            self._json_response({"ok": True})
+
+        elif path == "/api/action":
+            action = body.get("action", "")
+            if action == "confirm":
+                threading.Thread(target=confirm_rescue, daemon=True).start()
+            elif action == "false_alarm":
+                threading.Thread(target=reset_alarm, args=(None, "❌ Fehlalarm – System bereit."), daemon=True).start()
+            elif action == "done":
+                threading.Thread(target=reset_alarm, args=(None, "✅ Rettung abgeschlossen – System bereit!"), daemon=True).start()
+            elif action == "awareness":
+                with _lock:
+                    g["awareness_pending"] = False
+                    g["awareness_alarm"]   = False
+            self._json_response({"ok": True})
+
+        elif path == "/api/click":
+            xn = float(body.get("x", 0.5))
+            yn = float(body.get("y", 0.5))
+            fr = g.get("frame")
+            if fr is not None:
+                fh, fw = fr.shape[:2]
+                fx = xn * fw
+                fy = yn * fh
+                mold = g.get("mold", {})
+                best_d = float("inf")
+                best_pid = None
+                for tid, pos in mold.items():
+                    d = math.hypot(fx - pos[0], fy - pos[1])
+                    if d < g.get("radius", 3) * 40 and d < best_d:
+                        best_d = d
+                        best_pid = tid
+                if best_pid is not None and best_pid not in g.get("marked", set()):
+                    cur = g.get("person_sensitivity", {}).get(best_pid, 1.0)
+                    self._json_response({"pid": best_pid, "sensitivity": cur})
+                    return
+            self._json_response({"pid": None})
+
+        elif path == "/api/sensitivity":
+            pid  = body.get("pid")
+            mult = body.get("mult", 1.0)
+            if pid is not None:
+                sens = g.get("person_sensitivity", {})
+                if mult == 1.0:
+                    sens.pop(pid, None)
+                else:
+                    sens[pid] = mult
+                g["person_sensitivity"] = sens
+            self._json_response({"ok": True})
+
+        elif path == "/api/confirm_person":
+            pid = body.get("pid")
+            if pid is not None:
+                g["alarm_pid"] = pid
+                threading.Thread(target=confirm_rescue, daemon=True).start()
+            self._json_response({"ok": True})
+
+        elif path == "/api/dismiss":
+            pid = body.get("pid")
+            if pid is not None:
+                with _lock:
+                    g["marked"].discard(pid)
+                    g["counters"].pop(pid, None)
+                    g["notified"].discard(pid)
+                    g.setdefault("dismissed_cooldown", {})[pid] = time.time() + 30
+                _log_event("FEHLALARM", f"Person #{pid} einzeln als Fehlalarm markiert", person_id=pid)
+                if g.get("collect_training") and _HAS_STC:
+                    stc.label("FALSE_ALARM", details=f"Person #{pid} (einzeln)")
+                if not g["marked"] and g["state"] == "ALARM":
+                    threading.Thread(target=reset_alarm, args=(None, "❌ Fehlalarm – System bereit."), daemon=True).start()
+            self._json_response({"ok": True})
+
+        elif path == "/api/settings":
+            sens_name = body.get("sensitivity")
+            if sens_name and sens_name in SENSITIVITY:
+                p = SENSITIVITY[sens_name]
+                with _lock:
+                    g["distT"]  = p["distT"]
+                    g["frames"] = p["frames"]
+                    g["radius"] = p["radius"]
+                g["_sensitivity_name"] = sens_name
+            pico_ip = body.get("pico_ip")
+            if pico_ip and isinstance(pico_ip, str):
+                pico_ip = pico_ip.strip()
+            if pico_ip and _drone._pico_sender and _drone._pico_sender.ip != pico_ip:
+                _drone._pico_sender.ip = pico_ip
+                with _drone._pico_sender.lock:
+                    if _drone._pico_sender.sock:
+                        try: _drone._pico_sender.sock.close()
+                        except Exception: pass
+                        _drone._pico_sender.sock = None
+                        _drone._pico_sender.last_status = "Neue IP – verbinde..."
+                print(f"[PICO] IP geändert → {pico_ip}")
+            zones = body.get("exclusion_zones")
+            if zones is not None or pico_ip or sens_name:
+                cfg = _load_config() or {}
+                if zones is not None:
+                    with _lock:
+                        g["exclusion_zones"] = [tuple(z) for z in zones]
+                    cfg["exclusion_zones"] = [list(z) for z in zones]
+                if sens_name:
+                    cfg["sens"] = sens_name
+                if pico_ip:
+                    cfg["pico_ip"] = pico_ip
+                _save_config(cfg)
+            self._json_response({"ok": True})
+
+        elif path == "/api/zones":
+            zones = body.get("zones", [])
+            with _lock:
+                g["exclusion_zones"] = [tuple(z) for z in zones]
+            cfg = _load_config() or {}
+            cfg["exclusion_zones"] = [list(z) for z in zones]
+            _save_config(cfg)
+            self._json_response({"ok": True})
+
+        elif path == "/api/log/clear":
+            with _log_lock:
+                _save_log([])
+            self._json_response({"ok": True})
+
+        elif path == "/api/drone/stop":
+            if _drone._pico_sender:
+                _drone._pico_sender.clear_queue()
+                _drone._pico_sender.send("STOP")
+            with _lock:
+                g["drone_autonomous"] = False
+                g["drone_nav_cmd"]    = "NOTFALL STOP"
+            print("[DRONE] NOTFALL STOP via Web-UI")
+            self._json_response({"ok": True})
+
+        elif path == "/api/drone/aruco_reset":
+            g["drone_orientation_angle"] = None
+            self._json_response({"ok": True})
+
+        elif path == "/api/shutdown":
+            self._json_response({"ok": True})
+            stop_system()
+            threading.Thread(target=lambda: (time.sleep(0.5), os._exit(0)), daemon=True).start()
+
+        else:
+            self._json_response({"error": "Unknown endpoint"}, 404)
 
     def log_message(self, fmt, *args):
         pass
@@ -180,10 +429,15 @@ class _MJPEGHandler(BaseHTTPRequestHandler):
 
 def _start_stream_server():
     try:
-        server = HTTPServer(("0.0.0.0", STREAM_PORT), _MJPEGHandler)
+        ThreadingHTTPServer.allow_reuse_address = True
+        ThreadingHTTPServer.daemon_threads = True
+        server = ThreadingHTTPServer(("0.0.0.0", STREAM_PORT), _MJPEGHandler)
+        print(f"[SERVER] Web-UI läuft auf Port {STREAM_PORT}")
         server.serve_forever()
-    except Exception:
-        pass
+    except OSError as e:
+        print(f"[SERVER] FEHLER: Port {STREAM_PORT} belegt! Alten Prozess beenden und neu starten. ({e})")
+    except Exception as e:
+        print(f"[SERVER] FEHLER: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -297,10 +551,13 @@ def reset_alarm(cid=None, note=""):
         g.update(state="NORMAL", tg_sent=False, rescue=False, alarm_pid=None,
                  alert_cooldown_until=0.0, alarm_pending=False,
                  alarm_triggered_at=0.0, auto_dispatched=False)
+        # Nur Counter der alarmierten Personen löschen – aktiv getrackte
+        # Personen behalten ihren Fortschritts-Counter!
+        for _cid in list(g["marked"]) + list(g["locked"]) + list(g["notified"]):
+            g["counters"].pop(_cid, None)
         g["marked"].clear()
         g["locked"].clear()
         g["notified"].clear()
-        g["counters"].clear()
     if was_rescue:
         _log_event("RETTUNG_FERTIG", "Rettung abgeschlossen", person_id=pid)
     else:
@@ -671,7 +928,10 @@ def detection_loop():
                             "age": 0,
                         }
                     _grace.pop(old_tid, None)
-                    _last_bbox.pop(old_tid, None)
+                    # Für markierte/gesperrte Personen bbox NICHT löschen – wird
+                    # bis Rettungsabschluss an letzter Position gerendert
+                    if old_tid not in g.get("marked", set()) and old_tid not in g.get("locked", set()):
+                        _last_bbox.pop(old_tid, None)
                     g["counters"].pop(old_tid, None)
                     # Markierte Personen NICHT aus marked entfernen – bleiben
                     # markiert bis explizite Nutzer-Aktion (✅/❌)
@@ -685,6 +945,31 @@ def detection_loop():
             _ghost_pool[gid]["age"] += 1
             if _ghost_pool[gid]["age"] > 60:
                 _ghost_pool.pop(gid, None)
+
+        # 4. Persistente Anzeige ertrinkender Personen die nicht mehr getrackt
+        # werden – Bounding Box bleibt an letzter bekannter Position bis zur
+        # expliziten Rettungsbestätigung (✅/❌)
+        _all_drowning = g.get("marked", set()) | g.get("locked", set())
+        for _pid in _all_drowning:
+            if _pid not in mnew and _pid in _last_bbox:
+                bx1, by1, bx2, by2 = _last_bbox[_pid]
+                # Gestrichelter Rahmen + Fadenkreuz in dunklerem Rot ("zuletzt gesehen")
+                cv2.rectangle(frame, (bx1 - 4, by1 - 4), (bx2 + 4, by2 + 4), (0, 0, 220), 3)
+                icx, icy = int((bx1 + bx2) / 2), int((by1 + by2) / 2)
+                cv2.line(frame, (0, icy), (fw, icy), (0, 0, 180), 1)
+                cv2.line(frame, (icx, 0), (icx, fh), (0, 0, 180), 1)
+                cl = 20
+                for (ex, ey, dx, dy) in [(bx1, by1, 1, 1), (bx2, by1, -1, 1),
+                                          (bx1, by2, 1, -1), (bx2, by2, -1, -1)]:
+                    cv2.line(frame, (ex, ey), (ex + dx * cl, ey), (0, 0, 220), 3)
+                    cv2.line(frame, (ex, ey), (ex, ey + dy * cl), (0, 0, 220), 3)
+                lbl2 = "!! LETZTE POS !!"
+                (tw2, th2), _ = cv2.getTextSize(lbl2, cv2.FONT_HERSHEY_SIMPLEX, 0.65, 2)
+                cv2.rectangle(frame, (bx1, by1 - th2 - 16), (bx1 + tw2 + 10, by1 - 4), (0, 0, 160), -1)
+                cv2.putText(frame, lbl2, (bx1 + 5, by1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.65, (220, 220, 255), 2)
+                # Person an letzter Position in mold halten → Frontend-Seitenpanel bleibt sichtbar
+                mnew[_pid] = [icx, icy]
 
         # ── Bewegungs-Tracking / Alarm auslösen ───────────────────────────────
         mold = g["mold"]
@@ -712,11 +997,17 @@ def detection_loop():
                                         g["alarms"] += 1
                                         g["alert_cooldown_until"] = time.time() + 1.5
                                         trigger = True
+                                    elif g["state"] in ("ALARM", "RESCUE") and tid not in g["notified"]:
+                                        # Weitere Person erkannt während Alarm bereits läuft –
+                                        # Ton auslösen aber keinen neuen Telegram-Alarm senden
+                                        trigger = True
                             if trigger:
                                 g["notified"].add(tid)
                                 la, lo = px2gps(new_pos[0], new_pos[1], fw, fh)
-                                g.update(alarm_pid=tid, alarm_lat=la, alarm_lon=lo)
-                                threading.Thread(target=send_alert, args=(tid, la, lo), daemon=True).start()
+                                if g["state"] == "NORMAL":
+                                    # Erster Alarm: Telegram + Ton
+                                    g.update(alarm_pid=tid, alarm_lat=la, alarm_lon=lo)
+                                    threading.Thread(target=send_alert, args=(tid, la, lo), daemon=True).start()
                                 threading.Thread(target=alarm_sound, daemon=True).start()
                     else:
                         # Nur Counter zurücksetzen; als ertrinkend markierte Personen

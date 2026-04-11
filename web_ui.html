@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>S.A.V.E.R DRONE</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#151620;--panel:#1a1a2e;--card:#141428;
+  --green:#00cc30;--red:#ff0015;--orange:#ff8800;--blue:#0088ff;
+  --text:#ccccee;--muted:#445566;--border:#1a1a33;--logo:#5a5a7a;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
+  font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden}
+a{color:var(--blue);text-decoration:none}
+.screen{display:none;width:100%;height:100vh;flex-direction:column}
+.screen.active{display:flex}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;
+  align-items:center;justify-content:center}
+.modal-bg.active{display:flex}
+.modal{background:var(--bg);border:1px solid var(--border);border-radius:16px;
+  max-width:900px;width:95%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;border:none;
+  border-radius:10px;cursor:pointer;font-family:inherit;font-weight:600;
+  transition:background .15s,transform .1s;padding:0 16px}
+.btn:active{transform:scale(.97)}
+.btn-green{background:#005522;color:#fff;font-size:16px;height:52px}
+.btn-green:hover{background:#007733}
+.btn-red{background:#660000;color:#fff;font-size:16px;height:52px}
+.btn-red:hover{background:#880011}
+.btn-orange{background:#664400;color:#fff;font-size:16px;height:52px}
+.btn-orange:hover{background:#885500}
+.btn-blue{background:#003366;color:#8cf;font-size:14px;height:40px}
+.btn-blue:hover{background:#004488}
+.btn-ghost{background:transparent;color:var(--muted);font-size:13px;height:36px}
+.btn-ghost:hover{background:#1a1a33}
+.btn-sm{height:32px;font-size:13px;border-radius:8px;padding:0 12px}
+.btn-icon{width:40px;height:36px;font-size:18px;background:transparent;color:#667788;
+  border:none;border-radius:8px;cursor:pointer}
+.btn-icon:hover{background:#1a1a33}
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px}
+/* Form elements */
+select,input[type=text],input[type=number]{background:#0e0e1e;color:var(--text);
+  border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:inherit;
+  font-size:14px;outline:none;width:100%}
+select:focus,input:focus{border-color:var(--blue)}
+input[type=checkbox]{accent-color:var(--blue);width:18px;height:18px;margin-right:8px}
+label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
+.radio-group{display:flex;gap:8px;flex-wrap:wrap}
+.radio-opt{flex:1;min-width:120px}
+.radio-opt input{display:none}
+.radio-opt span{display:block;text-align:center;padding:12px 8px;border-radius:10px;
+  border:2px solid var(--border);cursor:pointer;transition:all .15s;font-weight:600}
+.radio-opt input:checked+span{border-color:var(--green);background:#0a2218;color:var(--green)}
+.radio-opt:hover span{border-color:#334455}
+.radio-desc{font-size:11px;color:var(--muted);text-align:center;margin-top:4px;font-weight:400}
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2a2a44;border-radius:3px}
+
+/* ── HOME SCREEN ── */
+#screen-home{align-items:center;justify-content:center}
+.home-card{text-align:center;padding:40px;max-width:500px}
+.home-logo{font-size:42px;font-weight:700;letter-spacing:6px;color:var(--logo);margin-bottom:4px}
+.home-sub{font-size:13px;color:var(--muted);margin-bottom:32px}
+.home-prev{background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:18px;margin-bottom:20px;text-align:left}
+.home-prev p{font-size:13px;color:var(--muted);margin-bottom:10px}
+.home-url{font-size:12px;color:var(--muted);margin-top:24px}
+.home-url code{color:var(--blue);font-size:13px}
+
+/* ── SETUP SCREEN ── */
+#screen-setup{align-items:center;overflow-y:auto}
+.setup-wrap{max-width:560px;width:100%;padding:30px 20px}
+.setup-title{font-size:24px;font-weight:700;color:var(--blue);margin-bottom:4px}
+.setup-subtitle{font-size:13px;color:var(--muted);margin-bottom:24px}
+.form-section{margin-bottom:20px}
+.form-section h3{font-size:11px;font-weight:700;color:#556688;text-transform:uppercase;
+  letter-spacing:1px;margin-bottom:8px}
+.form-row{display:flex;gap:10px;margin-bottom:8px}
+.form-row>*{flex:1}
+.form-err{color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px}
+.gps-grid{display:grid;grid-template-columns:80px 1fr 1fr;gap:6px;align-items:center}
+.gps-grid span{font-size:13px;color:var(--muted)}
+.zone-status{font-size:13px;margin-top:6px}
+
+/* ── MAIN SCREEN ── */
+.main-top{height:56px;background:var(--panel);display:flex;align-items:center;
+  padding:0 16px;flex-shrink:0;border-bottom:1px solid var(--border)}
+.main-top .logo{font-size:17px;font-weight:300;color:var(--logo);letter-spacing:2px}
+.badge{padding:4px 14px;border-radius:10px;font-size:13px;font-weight:700;margin-left:12px}
+.badge-normal{background:#0a2218;color:var(--green)}
+.badge-alarm{background:#550000;color:#fff}
+.badge-rescue{background:#553300;color:#fff}
+.main-top .clock{margin-left:auto;color:#556677;font-size:13px;margin-right:8px}
+.main-body{display:flex;flex:1;overflow:hidden}
+.video-area{flex:1;position:relative;background:#030310;overflow:hidden;cursor:default}
+.video-area.zoomed{cursor:grab}
+.video-area.zoomed.panning{cursor:grabbing}
+#zoom-wrap{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;transform-origin:50% 50%;will-change:transform}
+#zoom-wrap img{width:100%;height:100%;object-fit:contain;pointer-events:none}
+.zoom-indicator{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,0.65);color:#0af;font-size:12px;font-weight:700;
+  padding:3px 10px;border-radius:12px;z-index:40;pointer-events:none;
+  transition:opacity .4s;opacity:0}
+.zoom-indicator.visible{opacity:1}
+.video-placeholder{position:absolute;color:#252540;font-size:20px}
+.banner{position:absolute;top:0;left:0;right:0;height:56px;display:none;
+  align-items:center;justify-content:center;font-size:17px;font-weight:700;z-index:10}
+.banner.alarm{display:flex;background:#2a0000;color:#ff3333}
+.banner.rescue{display:flex;background:#1e1000;color:var(--orange)}
+/* Sensitivity popup */
+.sens-popup{position:absolute;background:#0d0d22;border:2px solid var(--blue);
+  border-radius:10px;padding:6px;z-index:30;min-width:180px;display:flex;
+  flex-direction:column;gap:2px;pointer-events:auto}
+.sens-popup .title{font-size:12px;font-weight:700;color:var(--text);text-align:center;
+  padding:2px 0}
+.sens-popup .current{font-size:10px;color:var(--muted);text-align:center;margin-bottom:4px}
+.sens-popup button{height:28px;border:none;border-radius:6px;cursor:pointer;font-size:12px;
+  font-weight:600;color:#fff;width:100%;margin:1px 0}
+/* Side panel */
+.side{width:240px;background:var(--panel);border-left:1px solid var(--border);
+  overflow-y:auto;flex-shrink:0;padding:14px 12px}
+.status-box{border-radius:14px;padding:12px;text-align:center;margin-bottom:10px;
+  border:1px solid}
+.status-box.normal{background:#0a2218;border-color:#1a3a2a}
+.status-box.alarm{background:#2a0008;border-color:#550011}
+.status-box.rescue{background:#1e1200;border-color:#443300}
+.status-lbl{font-size:18px;font-weight:700}
+.side-card{margin-bottom:8px}
+.side-card .label{font-size:10px;font-weight:700;color:#556688;text-transform:uppercase;
+  margin-bottom:4px}
+.side-big{font-size:42px;font-weight:700;text-align:center;padding:4px 0}
+.side-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.side-row .k{color:#667788}
+.side-row .v{font-weight:700}
+.side-sep{height:1px;background:var(--border);margin:8px 0}
+.side-section{font-size:10px;font-weight:700;color:#556688;margin:6px 0 4px}
+#drone-stop{width:100%;height:36px;background:#440000;color:#ff8888;border:none;
+  border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;margin-top:4px}
+#drone-stop:hover{background:#660000}
+#aruco-reset{width:100%;height:28px;background:#1a1a35;color:#6677aa;border:none;
+  border-radius:8px;cursor:pointer;font-size:11px;margin-top:4px}
+#aruco-reset:hover{background:#252555}
+.tg-status{font-size:11px;color:#3a6644;margin-top:10px}
+/* Drowning persons list in side panel */
+.drown-list{display:flex;flex-direction:column;gap:6px}
+.drown-entry{background:#1a0008;border:2px solid #550011;border-radius:10px;padding:8px;
+  display:flex;flex-direction:column;gap:4px;cursor:default;transition:border-color .2s}
+.drown-entry:hover{border-color:#ff4455}
+.drown-entry.locked{background:#1e1200;border-color:#443300}
+.drown-entry.locked:hover{border-color:var(--orange)}
+.drown-entry .de-head{display:flex;align-items:center;justify-content:space-between}
+.drown-entry .de-name{font-size:12px;font-weight:700;color:#ff6666}
+.drown-entry.locked .de-name{color:var(--orange)}
+.drown-entry .de-status{font-size:10px;color:#888}
+.drown-entry .de-actions{display:flex;gap:4px}
+.drown-entry .de-actions button{flex:1;height:28px;border:none;border-radius:6px;
+  cursor:pointer;font-size:12px;font-weight:600;color:#fff}
+.drown-entry .de-actions .de-yes{background:#005522}
+.drown-entry .de-actions .de-yes:hover{background:#007733}
+.drown-entry .de-actions .de-no{background:#660000}
+.drown-entry .de-actions .de-no:hover{background:#880011}
+/* Highlight ring on video for hovered person */
+.person-highlight{position:absolute;width:80px;height:80px;border:3px solid #ff4455;
+  border-radius:50%;pointer-events:none;z-index:20;transform:translate(-50%,-50%);
+  box-shadow:0 0 20px rgba(255,50,70,0.6);animation:pulse-ring 1s infinite}
+.person-highlight.locked{border-color:var(--orange);box-shadow:0 0 20px rgba(255,136,0,0.6)}
+@keyframes pulse-ring{0%,100%{opacity:1;transform:translate(-50%,-50%) scale(1)}50%{opacity:.6;transform:translate(-50%,-50%) scale(1.15)}}
+/* Ghost marker: last known position when person leaves frame */
+.ghost-marker{position:absolute;width:70px;height:70px;border:2px dashed #ff4455;
+  border-radius:50%;pointer-events:none;z-index:18;transform:translate(-50%,-50%);
+  animation:ghost-pulse 1.5s infinite;background:rgba(255,0,30,0.06)}
+.ghost-marker .ghost-lbl{position:absolute;top:-22px;left:50%;transform:translateX(-50%);
+  font-size:11px;font-weight:700;color:#ff4455;white-space:nowrap;
+  text-shadow:0 0 4px #000;background:rgba(0,0,0,0.6);padding:1px 5px;border-radius:4px}
+.ghost-marker .ghost-sub{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
+  font-size:9px;color:#ff8888;white-space:nowrap;text-shadow:0 0 4px #000}
+@keyframes ghost-pulse{0%,100%{opacity:.8}50%{opacity:.35}}
+/* GPS clipboard toast */
+.gps-toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);
+  background:rgba(0,136,255,0.92);color:#fff;font-size:12px;font-weight:700;
+  padding:5px 14px;border-radius:12px;z-index:999;pointer-events:none;
+  opacity:0;transition:opacity .3s}
+.gps-toast.show{opacity:1}
+/* Bottom bar */
+.main-bot{height:90px;background:var(--panel);border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;padding:0 20px;flex-shrink:0;
+  gap:12px;position:relative}
+.bot-msg{font-size:16px;position:absolute}
+.bot-actions{display:flex;gap:12px;width:100%;justify-content:center}
+.bot-actions .btn{flex:1;max-width:500px}
+
+/* ── MODAL CONTENT ── */
+.modal-header{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)}
+.modal-header h2{font-size:20px;font-weight:700;color:var(--blue)}
+.modal-header .close{margin-left:auto;font-size:22px;cursor:pointer;color:var(--muted);
+  background:none;border:none;padding:4px 10px;border-radius:6px}
+.modal-header .close:hover{background:#1a1a33;color:var(--text)}
+.modal-body{flex:1;overflow-y:auto;padding:16px 18px}
+.modal-footer{display:flex;align-items:center;padding:10px 18px;gap:10px;
+  border-top:1px solid var(--border)}
+/* Log table */
+.log-table{width:100%;border-collapse:collapse}
+.log-table th{text-align:left;font-size:11px;color:#556688;padding:6px 8px;
+  border-bottom:1px solid var(--border)}
+.log-table td{padding:8px;border-bottom:1px solid #0e0e1e;font-size:13px}
+.log-table tr:hover td{background:#0e0e1e}
+/* KPI boxes */
+.kpi-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.kpi{flex:1;min-width:100px;background:#0e0e20;border:1px solid var(--border);
+  border-radius:12px;padding:10px;text-align:center}
+.kpi .val{font-size:28px;font-weight:700}
+.kpi .lbl{font-size:11px;color:var(--muted)}
+/* Bar chart */
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:140px;
+  padding:10px 0;border-bottom:1px solid var(--border)}
+.bar-chart .bar{flex:1;min-width:20px;background:var(--red);border-radius:4px 4px 0 0;
+  position:relative;transition:height .3s}
+.bar-chart .bar span{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);
+  font-size:9px;color:var(--muted);white-space:nowrap}
+
+/* Zone editor */
+.zone-editor{position:relative;background:#030310;display:flex;align-items:center;
+  justify-content:center}
+.zone-editor canvas{position:absolute;cursor:crosshair}
+.zone-editor img{max-width:100%;max-height:100%;object-fit:contain}
+.zone-info{font-size:12px;color:var(--muted);padding:8px 0}
+
+/* Blink animation */
+@keyframes alarm-blink{
+  0%,100%{background:#1a0005}
+  50%{background:var(--bg)}
+}
+.blink-alarm{animation:alarm-blink .6s infinite}
+.blink-alarm .main-bot{animation:alarm-blink .6s infinite}
+
+/* Mobile-drown panel: hidden on desktop, visible on mobile */
+.mobile-drown{display:none}
+/* Responsive */
+@media(max-width:768px){
+  .side{display:none}
+  .main-top .logo{font-size:14px;letter-spacing:1px}
+  /* Mobile: show drowning panel floating above bottom bar */
+  .mobile-drown{display:flex;flex-direction:column;gap:6px;position:absolute;
+    bottom:96px;left:8px;right:8px;z-index:25;max-height:40vh;overflow-y:auto}
+  .mobile-drown .drown-entry{box-shadow:0 4px 16px rgba(0,0,0,.6)}
+}
+</style>
+</head>
+<body>
+
+<div id="gps-toast" class="gps-toast"></div>
+
+<!-- ══════════════════════ HOME SCREEN ══════════════════════ -->
+<div id="screen-home" class="screen active">
+  <div class="home-card">
+    <div class="home-logo">S.A.V.E.R.</div>
+    <div class="home-sub">Smart Aerial View for Emergency Rescue · DRONE EDITION</div>
+    <div id="home-prev" class="home-prev" style="display:none">
+      <p>Letzte Konfiguration:</p>
+      <div id="home-prev-info" style="color:var(--text);font-size:14px;margin-bottom:12px"></div>
+      <button class="btn btn-green" style="width:100%;margin-bottom:8px" onclick="quickStart()">
+        ▶&ensp;STARTEN</button>
+      <button class="btn btn-ghost" style="width:100%" onclick="showScreen('setup')">
+        ⚙&ensp;Einstellungen ändern</button>
+    </div>
+    <div id="home-no-prev">
+      <button class="btn btn-green" style="width:100%;margin-bottom:8px" onclick="showScreen('setup')">
+        ▶&ensp;EINRICHTEN &amp; STARTEN</button>
+    </div>
+    <div class="home-url">
+      📱 Handy-Remote: <code id="home-url"></code>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ SETUP SCREEN ══════════════════════ -->
+<div id="screen-setup" class="screen" style="align-items:center;overflow-y:auto">
+  <div class="setup-wrap">
+    <div class="setup-title">⚙ Einstellungen</div>
+    <div class="setup-subtitle">Konfiguration vor dem Start</div>
+
+    <div class="form-section">
+      <h3>Kamera</h3>
+      <select id="cfg-cam">
+        <option>Hauptkamera</option><option>Kamera 2</option><option>Kamera 3</option>
+      </select>
+    </div>
+
+    <div class="form-section">
+      <h3>Überwachungsbereich</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">
+        Markiere Bereiche die NICHT zum Wasser gehören (z.B. Liegewiese, Gebäude).</p>
+      <button class="btn btn-blue btn-sm" onclick="openZoneEditor()">
+        📷&ensp;Kameravorschau öffnen</button>
+      <div id="zone-status" class="zone-status" style="color:var(--muted)">
+        Keine Zonen definiert</div>
+    </div>
+
+    <div class="form-section">
+      <label><input type="checkbox" id="cfg-gps" onchange="toggleGps()">
+        GPS-Koordinaten für Standort-Erkennung verwenden</label>
+      <div id="gps-fields" style="display:none;margin-top:10px">
+        <div class="gps-grid">
+          <span>Oben-Links</span>
+          <input type="text" id="cfg-lat1" placeholder="Lat (z.B. 48.123456)">
+          <input type="text" id="cfg-lon1" placeholder="Lon (z.B. 11.654321)">
+          <span>Unten-Rechts</span>
+          <input type="text" id="cfg-lat2" placeholder="Lat">
+          <input type="text" id="cfg-lon2" placeholder="Lon">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label><input type="checkbox" id="cfg-training">
+        Trainingsdaten sammeln (Pose-Keypoints für KI)</label>
+      <div style="height:6px"></div>
+      <label><input type="checkbox" id="cfg-autotakeoff" checked>
+        Auto-Takeoff: Drohne startet automatisch bei Rettungsbestätigung</label>
+    </div>
+
+    <div class="form-section">
+      <h3>Alarm-Empfindlichkeit</h3>
+      <div class="radio-group">
+        <label class="radio-opt"><input type="radio" name="sens" value="Niedrig">
+          <span>Niedrig<div class="radio-desc">Weniger empfindlich, langsamer Auslöser</div></span></label>
+        <label class="radio-opt"><input type="radio" name="sens" value="Mittel" checked>
+          <span>Mittel<div class="radio-desc">Standard-Empfindlichkeit</div></span></label>
+        <label class="radio-opt"><input type="radio" name="sens" value="Hoch">
+          <span>Hoch<div class="radio-desc">Sehr empfindlich, schnellster Auslöser</div></span></label>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3>Drohne</h3>
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Pico IP-Adresse</label>
+      <input type="text" id="cfg-pico-ip" placeholder="z.B. 192.168.43.21" style="width:100%">
+    </div>
+
+    <div id="setup-err" class="form-err"></div>
+    <button class="btn btn-green" style="width:100%;height:60px;font-size:18px" onclick="startSystem()">
+      ▶&ensp;SPEICHERN &amp; STARTEN</button>
+    <button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="showScreen('home')">
+      ← Zurück</button>
+  </div>
+</div>
+
+<!-- ══════════════════════ MAIN SCREEN ══════════════════════ -->
+<div id="screen-main" class="screen">
+  <!-- TOP BAR -->
+  <div class="main-top">
+    <span class="logo">S . A . V . E . R .&ensp;DRONE</span>
+    <span id="badge" class="badge badge-normal">●&ensp;BEREIT</span>
+    <span class="clock" id="clock"></span>
+    <button class="btn-icon" onclick="openModal('qr')" title="Handy-Remote">📱</button>
+    <button class="btn-icon" onclick="openModal('stats')" title="Statistik">📊</button>
+    <button class="btn-icon" onclick="openModal('logbook')" title="Logbuch">📋</button>
+    <button class="btn-icon" onclick="openModal('settings')" title="Einstellungen">⚙</button>
+    <button class="btn-icon" id="grid-toggle-btn" onclick="toggleGrid()" title="Planungsgitter ein/aus" style="font-size:15px">⊞</button>
+    <button class="btn-icon" onclick="shutdownSystem()" title="System beenden" style="color:#ff4455">⏻</button>
+  </div>
+  <!-- CONTENT -->
+  <div class="main-body">
+    <!-- VIDEO -->
+    <div class="video-area" id="video-area">
+      <div id="zoom-wrap">
+        <img id="video-stream" draggable="false"
+             style="user-select:none;-webkit-user-select:none"
+             onload="document.getElementById('video-ph').style.display='none'"
+             onerror="_onStreamError()">
+        <canvas id="grid-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;display:none"></canvas>
+      </div>
+      <div class="video-placeholder" id="video-ph">📷&ensp;Kamera wird gestartet …</div>
+      <div class="banner" id="banner"></div>
+      <div id="person-overlays" style="position:absolute;inset:0;pointer-events:none;z-index:15"></div>
+      <div id="sens-popup-container" style="position:absolute;inset:0;pointer-events:none;z-index:30"></div>
+      <div class="zoom-indicator" id="zoom-indicator">1.0×</div>
+    </div>
+    <!-- SIDE PANEL -->
+    <div class="side" id="side-panel">
+      <div class="status-box normal" id="status-box">
+        <div class="status-lbl" id="status-lbl" style="color:var(--green)">●&ensp;BEREIT</div>
+      </div>
+      <div class="card side-card">
+        <div class="label">PERSONEN IM BILD</div>
+        <div class="side-big" id="s-persons">0</div>
+      </div>
+      <div class="card side-card">
+        <div class="side-row"><span class="k">Alarme</span>
+          <span class="v" id="s-alarms">0</span></div>
+      </div>
+      <div class="card side-card">
+        <div class="side-row"><span class="k">Empfindlichkeit</span>
+          <span class="v" id="s-sens" style="color:var(--green)">Mittel</span></div>
+      </div>
+      <div class="side-sep"></div>
+      <div class="side-section">🚁&ensp;DROHNE</div>
+      <div class="card side-card" id="drone-card">
+        <div class="side-row"><span class="k">Pico</span><span class="v" id="s-pico">–</span></div>
+        <div class="side-row"><span class="k">Modus</span><span class="v" id="s-dmode" style="color:#6677aa">BEREIT</span></div>
+        <div class="side-row"><span class="k">ArUco</span><span class="v" id="s-aruco" style="color:var(--muted)">–</span></div>
+        <div class="side-row"><span class="k">Cmd</span><span class="v" id="s-nav" style="color:var(--muted)">–</span></div>
+      </div>
+      <div id="drown-section" style="display:none">
+        <div class="side-sep"></div>
+        <div class="side-section">🚨&ensp;ERTRINKENDE</div>
+        <div class="drown-list" id="drown-list"></div>
+      </div>
+      <div class="side-sep"></div>
+      <button id="drone-stop" onclick="droneStop()">🛑&ensp;DROHNE STOPP</button>
+      <button id="aruco-reset" onclick="arucoReset()">↺&ensp;ArUco Reset</button>
+      <div class="tg-status">Telegram ✓</div>
+    </div>
+  </div>
+  <!-- BOTTOM BAR -->
+  <div class="main-bot" id="main-bot">
+    <span class="bot-msg" id="bot-msg" style="color:var(--green)">
+      ✅&ensp;System aktiv – Alle Personen werden überwacht</span>
+    <div class="bot-actions" id="bot-actions" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════ MODALS ══════════════════════ -->
+
+<!-- LOGBOOK -->
+<div class="modal-bg" id="modal-logbook">
+  <div class="modal" style="max-width:750px;height:80vh">
+    <div class="modal-header">
+      <h2>📋&ensp;Logbuch</h2>
+      <select id="log-filter" onchange="renderLogbook()" style="width:160px;margin-left:auto;margin-right:12px">
+        <option>Alle</option><option>Alarme</option><option>Fehlalarme</option>
+        <option>Rettungen</option><option>System</option>
+      </select>
+      <button class="close" onclick="closeModal('logbook')">&times;</button>
+    </div>
+    <div class="modal-body" id="log-body"></div>
+    <div class="modal-footer">
+      <span id="log-count" style="font-size:12px;color:var(--muted)"></span>
+      <span style="flex:1"></span>
+      <button class="btn btn-red btn-sm" onclick="clearLog()">🗑&ensp;Logbuch leeren</button>
+      <button class="btn btn-blue btn-sm" onclick="exportLogCsv()">📥&ensp;CSV Export</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="modal-bg" id="modal-stats">
+  <div class="modal" style="max-width:880px;height:85vh">
+    <div class="modal-header">
+      <h2>📊&ensp;Statistik-Dashboard</h2>
+      <select id="stats-range" onchange="renderStats()" style="width:140px;margin-left:auto;margin-right:12px">
+        <option>Heute</option><option selected>7 Tage</option><option>30 Tage</option><option>Gesamt</option>
+      </select>
+      <button class="close" onclick="closeModal('stats')">&times;</button>
+    </div>
+    <div class="modal-body" id="stats-body"></div>
+    <div class="modal-footer">
+      <span style="flex:1"></span>
+      <button class="btn btn-red btn-sm" onclick="clearStats()">🗑&ensp;Statistik zurücksetzen</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="modal-bg" id="modal-settings">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h2>⚙&ensp;Einstellungen</h2>
+      <button class="close" onclick="closeModal('settings')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#556677;margin-bottom:16px">Kamera-Änderungen erfordern einen Neustart. Alle anderen Änderungen wirken sofort.</p>
+
+      <div class="form-section">
+        <h3>Kamera</h3>
+        <select id="set-cam">
+          <option>Hauptkamera</option><option>Kamera 2</option><option>Kamera 3</option>
+        </select>
+      </div>
+
+      <div class="form-section">
+        <h3>Alarm-Empfindlichkeit</h3>
+        <div class="radio-group">
+          <label class="radio-opt"><input type="radio" name="set-sens" value="Niedrig">
+            <span>Niedrig<div class="radio-desc">Weniger empfindlich</div></span></label>
+          <label class="radio-opt"><input type="radio" name="set-sens" value="Mittel">
+            <span>Mittel<div class="radio-desc">Standard</div></span></label>
+          <label class="radio-opt"><input type="radio" name="set-sens" value="Hoch">
+            <span>Hoch<div class="radio-desc">Sehr empfindlich</div></span></label>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <label><input type="checkbox" id="set-gps" onchange="toggleSetGps()">
+          GPS-Koordinaten verwenden</label>
+        <div id="set-gps-fields" style="display:none;margin-top:10px">
+          <div class="gps-grid">
+            <span>Oben-Links</span>
+            <input type="text" id="set-lat1" placeholder="Lat">
+            <input type="text" id="set-lon1" placeholder="Lon">
+            <span>Unten-Rechts</span>
+            <input type="text" id="set-lat2" placeholder="Lat">
+            <input type="text" id="set-lon2" placeholder="Lon">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <label><input type="checkbox" id="set-autotakeoff">
+          Auto-Takeoff bei Rettungsbestätigung</label>
+        <div style="height:6px"></div>
+        <label><input type="checkbox" id="set-training">
+          Trainingsdaten sammeln</label>
+      </div>
+
+      <div class="form-section">
+        <h3>Drohne</h3>
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Pico IP-Adresse</label>
+        <input type="text" id="set-pico-ip" placeholder="z.B. 192.168.43.21" style="width:100%">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Änderung trennt und reconnectet die Drohne sofort.</div>
+      </div>
+
+      <div class="form-section">
+        <h3>Überwachungsbereich</h3>
+        <button class="btn btn-blue btn-sm" onclick="closeModal('settings');openZoneEditor()">
+          📷&ensp;Bereiche bearbeiten</button>
+        <div id="set-zone-status" class="zone-status" style="color:var(--muted);margin-top:6px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span style="flex:1"></span>
+      <button class="btn btn-green btn-sm" onclick="applySettings()">✓&ensp;Übernehmen &amp; Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR / URL -->
+<div class="modal-bg" id="modal-qr">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2>📱&ensp;Handy-Remote</h2>
+      <button class="close" onclick="closeModal('qr')">&times;</button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:24px 30px 28px">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+        PC und Handy müssen im gleichen WLAN sein.</p>
+      <!-- QR code -->
+      <div id="qr-canvas-wrap" style="display:inline-block;background:#fff;padding:12px;border-radius:10px;margin-bottom:16px"></div>
+      <!-- URL box -->
+      <div style="background:#0e0e20;padding:10px 14px;border-radius:10px;margin-bottom:18px;display:flex;align-items:center;gap:8px">
+        <code id="qr-url" style="flex:1;font-size:14px;color:var(--blue);word-break:break-all;text-align:left"></code>
+        <button id="qr-copy-btn" onclick="copyQrUrl()" title="Kopieren"
+          style="flex-shrink:0;background:#1a1a3a;border:1px solid #334;color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">📋</button>
+      </div>
+      <!-- Share / Copy -->
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button id="qr-share-btn" onclick="shareQrUrl()"
+          style="background:var(--blue);color:#fff;border:none;padding:9px 22px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">🔗&ensp;Teilen</button>
+        <button onclick="copyQrUrl()"
+          style="background:#1a1a3a;border:1px solid #334;color:var(--text);padding:9px 22px;border-radius:8px;cursor:pointer;font-size:14px">📋&ensp;Kopieren</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ZONE EDITOR -->
+<div class="modal-bg" id="modal-zones">
+  <div class="modal" style="max-width:960px;height:85vh">
+    <div class="modal-header">
+      <h2>🎯&ensp;Nichtwasserbereiche markieren</h2>
+      <button class="close" onclick="closeZoneEditor()">&times;</button>
+    </div>
+    <p style="font-size:12px;color:#778899;padding:8px 18px">
+      Ziehe Rechtecke über Bereiche die NICHT überwacht werden sollen. Rechtsklick = Zone löschen.</p>
+    <div class="modal-body" style="padding:0;flex:1;display:flex;align-items:center;justify-content:center;
+         position:relative;background:#030310" id="zone-canvas-wrap">
+      <img id="zone-img" style="max-width:100%;max-height:100%;object-fit:contain" draggable="false">
+      <canvas id="zone-canvas" style="position:absolute;cursor:crosshair"></canvas>
+    </div>
+    <div class="modal-footer">
+      <span id="zone-count" class="zone-info">Keine Zonen definiert</span>
+      <button class="btn btn-red btn-sm" onclick="clearAllZones()">Alle löschen</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-green btn-sm" onclick="saveZones()">✓&ensp;Fertig</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ JAVASCRIPT ══════════════════════ -->
+<script>
+// ── STATE ────────────────────────────────────────────────────────────────────
+let savedConfig = null;
+let currentSens = 'Mittel';
+let exclusionZones = [];
+let pollTimer = null;
+let lastState = null;
+let anchors = {};
+let lastKnownPos = {}; // pid → {x,y} in normalized [0,1] — persists until rescue done
+let _gpsClipTimer = null;
+const EVT = {
+  ALARM:              {color:'#ff2233',icon:'🚨',label:'Alarm'},
+  RETTUNG_BESTAETIGT: {color:'#ff8800',icon:'🚁',label:'Rettung bestätigt'},
+  FEHLALARM:          {color:'#888888',icon:'❌',label:'Fehlalarm'},
+  RETTUNG_FERTIG:     {color:'#00cc66',icon:'✅',label:'Rettung abgeschlossen'},
+  SYSTEM_START:       {color:'#0088ff',icon:'▶',label:'System gestartet'},
+  SYSTEM_STOP:        {color:'#556677',icon:'⏹',label:'System gestoppt'},
+  AWARENESS_ALARM:    {color:'#ff8800',icon:'🔔',label:'Anwesenheits-Alarm'},
+};
+
+// ── API ──────────────────────────────────────────────────────────────────────
+async function apiGet(path){
+  const r=await fetch(path);return r.json();
+}
+async function apiPost(path,data){
+  const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(data||{})});return r.json();
+}
+
+// ── SCREEN MANAGEMENT ────────────────────────────────────────────────────────
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById('screen-'+name);
+  if(el) el.classList.add('active');
+  if(name==='main'){ startPolling(); reconnectStream(); }
+  else{ stopPolling(); disconnectStream(); resetZoom(); }
+  if(name==='setup') loadSetupFromConfig();
+}
+let _reconnAttempts=0;
+function reconnectStream(){
+  const img=document.getElementById('video-stream');
+  if(!document.getElementById('screen-main').classList.contains('active')) return;
+  _reconnAttempts=0;
+  img.src='/stream?t='+Date.now();
+}
+function _onStreamError(){
+  _reconnAttempts++;
+  const delay=Math.min(1000*Math.pow(1.5,_reconnAttempts),10000);
+  setTimeout(reconnectStream,delay);
+}
+function disconnectStream(){
+  const img=document.getElementById('video-stream');
+  img.removeAttribute('src');
+  document.getElementById('video-ph').style.display='';
+}
+function openModal(name){
+  const el=document.getElementById('modal-'+name);
+  if(el){ el.classList.add('active'); el.onclick=e=>{if(e.target===el)closeModal(name)}; }
+  if(name==='logbook') renderLogbook();
+  if(name==='stats') renderStats();
+  if(name==='settings') loadSettingsModal();
+  if(name==='qr') openQrModal();
+}
+function closeModal(name){
+  const el=document.getElementById('modal-'+name);
+  if(el) el.classList.remove('active');
+}
+
+// ── HOME SCREEN ──────────────────────────────────────────────────────────────
+async function initHome(){
+  document.getElementById('home-url').textContent=location.origin;
+  try{
+    const cfg=await apiGet('/api/config');
+    if(cfg && cfg.cam){
+      savedConfig=cfg;
+      document.getElementById('home-prev').style.display='block';
+      document.getElementById('home-no-prev').style.display='none';
+      document.getElementById('home-prev-info').innerHTML=
+        `<b>${cfg.cam}</b> · ${cfg.sens||'Mittel'} · GPS ${cfg.use_gps?'an':'aus'}`;
+    }
+  }catch(e){}
+  // Check if already running
+  try{
+    const s=await apiGet('/api/status');
+    if(s.running) showScreen('main');
+  }catch(e){}
+}
+
+async function quickStart(){
+  if(!savedConfig) return showScreen('setup');
+  try{
+    const r=await apiPost('/api/start',savedConfig);
+    if(r.ok){currentSens=savedConfig.sens||'Mittel';showScreen('main');}
+    else{showScreen('setup');}
+  }catch(e){showScreen('setup');}
+}
+
+// ── SETUP SCREEN ─────────────────────────────────────────────────────────────
+function loadSetupFromConfig(){
+  if(!savedConfig) return;
+  document.getElementById('cfg-cam').value=savedConfig.cam||'Hauptkamera';
+  const sens=savedConfig.sens||'Mittel';
+  document.querySelector(`input[name="sens"][value="${sens}"]`).checked=true;
+  document.getElementById('cfg-gps').checked=!!savedConfig.use_gps;
+  document.getElementById('cfg-autotakeoff').checked=savedConfig.auto_takeoff!==false;
+  document.getElementById('cfg-training').checked=!!savedConfig.collect_training;
+  if(savedConfig.lat1) document.getElementById('cfg-lat1').value=savedConfig.lat1;
+  if(savedConfig.lon1) document.getElementById('cfg-lon1').value=savedConfig.lon1;
+  if(savedConfig.lat2) document.getElementById('cfg-lat2').value=savedConfig.lat2;
+  if(savedConfig.lon2) document.getElementById('cfg-lon2').value=savedConfig.lon2;
+  if(savedConfig.exclusion_zones) exclusionZones=savedConfig.exclusion_zones.map(z=>[...z]);
+  const picoEl=document.getElementById('cfg-pico-ip');
+  if(picoEl) picoEl.value=savedConfig.pico_ip||'';
+  toggleGps();
+  updateZoneStatus();
+}
+function toggleGps(){
+  document.getElementById('gps-fields').style.display=
+    document.getElementById('cfg-gps').checked?'block':'none';
+}
+function updateZoneStatus(){
+  const n=exclusionZones.length;
+  const el=document.getElementById('zone-status');
+  if(el){
+    el.textContent=n?`${n} Nichtwasserbereich(e) definiert ✓`:'Keine Zonen definiert';
+    el.style.color=n?'var(--green)':'var(--muted)';
+  }
+  const el2=document.getElementById('set-zone-status');
+  if(el2){
+    el2.textContent=n?`${n} Zone(n) definiert`:'Keine Zonen';
+    el2.style.color=n?'var(--green)':'var(--muted)';
+  }
+}
+function getSetupConfig(){
+  const sens=document.querySelector('input[name="sens"]:checked');
+  return {
+    cam: document.getElementById('cfg-cam').value,
+    sens: sens?sens.value:'Mittel',
+    use_gps: document.getElementById('cfg-gps').checked,
+    collect_training: document.getElementById('cfg-training').checked,
+    auto_takeoff: document.getElementById('cfg-autotakeoff').checked,
+    lat1: document.getElementById('cfg-lat1').value||'0',
+    lon1: document.getElementById('cfg-lon1').value||'0',
+    lat2: document.getElementById('cfg-lat2').value||'0',
+    lon2: document.getElementById('cfg-lon2').value||'0',
+    exclusion_zones: exclusionZones,
+    pico_ip: document.getElementById('cfg-pico-ip').value.trim(),
+  };
+}
+async function startSystem(){
+  const cfg=getSetupConfig();
+  const err=document.getElementById('setup-err');
+  if(cfg.use_gps){
+    const gpsVals=[cfg.lat1,cfg.lon1,cfg.lat2,cfg.lon2].map(Number);
+    if(gpsVals.some(isNaN)){
+      err.textContent='⚠️ Bitte alle GPS-Felder korrekt ausfüllen'; return;
+    }
+  }
+  err.textContent='';
+  try{
+    const r=await apiPost('/api/start',cfg);
+    if(r.ok){ savedConfig=cfg; currentSens=cfg.sens; showScreen('main'); }
+    else{ err.textContent=r.error||'Fehler beim Starten'; }
+  }catch(e){ err.textContent='Server nicht erreichbar'; }
+}
+
+// ── MAIN SCREEN POLLING ──────────────────────────────────────────────────────
+function startPolling(){
+  if(pollTimer) return;
+  poll();
+  pollTimer=setInterval(poll,500);
+}
+function stopPolling(){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+}
+async function poll(){
+  try{
+    const s=await apiGet('/api/status');
+    updateMainScreen(s);
+  }catch(e){console.error('poll error:',e);}
+}
+
+function updateMainScreen(s){
+  // Clock
+  document.getElementById('clock').textContent=s.clock||'';
+  // Persons & Alarms
+  document.getElementById('s-persons').textContent=s.persons;
+  document.getElementById('s-alarms').textContent=s.alarms;
+  document.getElementById('s-sens').textContent=s.sensitivity||'Mittel';
+  // Badge
+  const badge=document.getElementById('badge');
+  const statusBox=document.getElementById('status-box');
+  const statusLbl=document.getElementById('status-lbl');
+  if(s.state==='ALARM'){
+    badge.className='badge badge-alarm';badge.innerHTML='🚨&ensp;ALARM';
+    statusBox.className='status-box alarm';
+    statusLbl.innerHTML='🚨&ensp;ALARM';statusLbl.style.color='#ff3333';
+  }else if(s.state==='RESCUE'){
+    badge.className='badge badge-rescue';badge.innerHTML='🏊&ensp;RETTUNG LÄUFT';
+    statusBox.className='status-box rescue';
+    statusLbl.innerHTML='🏊&ensp;RETTUNG LÄUFT';statusLbl.style.color='var(--orange)';
+  }else{
+    badge.className='badge badge-normal';badge.innerHTML='●&ensp;BEREIT';
+    statusBox.className='status-box normal';
+    statusLbl.innerHTML='●&ensp;BEREIT';statusLbl.style.color='var(--green)';
+  }
+  // Banner
+  const banner=document.getElementById('banner');
+  if(s.state==='ALARM'){
+    banner.className='banner alarm';
+    const gps=s.use_gps?` – GPS ${(s.alarm_lat||0).toFixed(5)}, ${(s.alarm_lon||0).toFixed(5)}`:'';
+    banner.textContent=`🚨 ALARM – Person #${s.alarm_pid||'?'}${gps} – SOFORT HANDELN!`;
+  }else if(s.state==='RESCUE'){
+    banner.className='banner rescue';
+    banner.textContent='🏊 RETTUNG LÄUFT – Drohne fliegt zur Person';
+  }else{
+    banner.className='banner';
+  }
+  // Blink
+  const mainEl=document.getElementById('screen-main');
+  if(s.state==='ALARM'||s.state==='RESCUE') mainEl.classList.add('blink-alarm');
+  else mainEl.classList.remove('blink-alarm');
+  // Bottom bar
+  updateBottomBar(s);
+  // Drone
+  updateDrone(s.drone||{});
+  // Person overlays
+  try{ updatePersonOverlays(s); }catch(e){ console.error('overlay error:',e); }
+  // Video placeholder
+  if(s.running) document.getElementById('video-ph').style.display='none';
+  if(_gridVisible) drawGrid();
+  // GPS clipboard: copy every 5s during ALARM/RESCUE when GPS active
+  _updateGpsClipboard(s);
+  // Awareness
+  if(s.awareness_pending && s.state==='NORMAL'){
+    showBotMsg('🔔 Bitte Anwesenheit bestätigen!','var(--orange)');
+    showBotActions([{text:'✅ ICH BIN DA – Anwesenheit bestätigen',cls:'btn-green',
+      action:()=>apiPost('/api/action',{action:'awareness'})}]);
+  }
+  // TG action note
+  if(s.tg_action_note && s.state==='NORMAL'){
+    showBotMsg(s.tg_action_note,'var(--blue)');
+  }
+  lastState=s.state;
+}
+
+function updateBottomBar(s){
+  const msg=document.getElementById('bot-msg');
+  const actions=document.getElementById('bot-actions');
+  if(s.state==='ALARM'){
+    actions.style.display='none';
+    // On mobile, side panel is hidden — show brief inline action buttons
+    if(window.innerWidth<=768){
+      msg.style.display='none';
+      actions.style.display='flex';
+      actions.innerHTML='';
+      const bm1=document.createElement('button');
+      bm1.className='btn btn-green';bm1.innerHTML='✅&ensp;Bestätigen';
+      bm1.onclick=()=>apiPost('/api/action',{action:'confirm'});
+      const bm2=document.createElement('button');
+      bm2.className='btn btn-red';bm2.innerHTML='❌&ensp;Fehlalarm';
+      bm2.onclick=()=>apiPost('/api/action',{action:'false_alarm'});
+      actions.appendChild(bm1);actions.appendChild(bm2);
+    }else{
+      showBotMsg('🚨 ALARM – Aktionen im Side Panel rechts','#ff3333');
+    }
+  }else if(s.state==='RESCUE'){
+    msg.style.display='none';
+    actions.style.display='flex';
+    actions.innerHTML='';
+    const b=document.createElement('button');
+    b.className='btn btn-orange';b.style.maxWidth='600px';
+    b.innerHTML='🏊&ensp;RETTUNG ABGESCHLOSSEN – System zurücksetzen';
+    b.onclick=()=>apiPost('/api/action',{action:'done'});
+    actions.appendChild(b);
+  }else{
+    actions.style.display='none';
+    if(!s.awareness_pending && !s.tg_action_note){
+      showBotMsg('✅ System aktiv – Alle Personen werden überwacht','var(--green)');
+    }
+  }
+}
+function showBotMsg(text,color){
+  const msg=document.getElementById('bot-msg');
+  msg.style.display='';msg.textContent=text;msg.style.color=color;
+  document.getElementById('bot-actions').style.display='none';
+}
+function showBotActions(btns){
+  const el=document.getElementById('bot-actions');
+  el.style.display='flex';el.innerHTML='';
+  document.getElementById('bot-msg').style.display='none';
+  btns.forEach(b=>{
+    const btn=document.createElement('button');
+    btn.className='btn '+b.cls;btn.textContent=b.text;btn.onclick=b.action;
+    el.appendChild(btn);
+  });
+}
+
+function updateDrone(d){
+  const pico=document.getElementById('s-pico');
+  pico.textContent=(d.pico||'–').substring(0,22);
+  pico.style.color=(d.pico||'').includes('Verbunden')?'var(--green)':'#888';
+  const mode=document.getElementById('s-dmode');
+  if(d.reached){mode.textContent='ZIEL ERREICHT';mode.style.color='var(--green)';}
+  else if(d.autonomous){mode.textContent='AUTONOM ✈';mode.style.color='var(--orange)';}
+  else{mode.textContent='BEREIT';mode.style.color='#6677aa';}
+  const aruco=document.getElementById('s-aruco');
+  if(d.aruco_pos && d.orientation_angle!==null){
+    aruco.textContent=`${d.aruco_pos[0]},${d.aruco_pos[1]} | ${d.orientation_angle.toFixed(0)}°`;
+    aruco.style.color='var(--green)';
+  }else{aruco.textContent='Nicht sichtbar';aruco.style.color='var(--muted)';}
+  const nav=document.getElementById('s-nav');
+  const cmd=d.nav_cmd||'';
+  nav.textContent=cmd?cmd.substring(0,16):'–';
+  nav.style.color=cmd?'var(--orange)':'var(--muted)';
+}
+
+// ── PERSON OVERLAYS (side panel + hover highlight) ──────────────────────────
+let _lastDrownStatus=null; // cache to avoid needless DOM rebuilds
+function updatePersonOverlays(s){
+  const overlay=document.getElementById('person-overlays');
+  const section=document.getElementById('drown-section');
+  const list=document.getElementById('drown-list');
+  const marked=new Set((s.marked||[]).map(Number));
+  const locked=new Set((s.locked||[]).map(Number));
+  const allDrowning=new Set([...marked,...locked]);
+  const mold=s.mold||{};
+  const state=s.state;
+  const frameW=s.frame_size?s.frame_size[0]:1;
+  const frameH=s.frame_size?s.frame_size[1]:1;
+
+  // Update anchors for highlight positioning
+  allDrowning.forEach(pid=>{
+    const pidStr=String(pid);
+    if(mold[pidStr]){
+      const ncx=mold[pidStr][0]/frameW;
+      const ncy=mold[pidStr][1]/frameH;
+      if(!anchors[pid]) anchors[pid]={x:ncx,y:ncy};
+      else{
+        const ax=anchors[pid].x,ay=anchors[pid].y;
+        if(Math.hypot(ncx-ax,ncy-ay)>0.15) anchors[pid]={x:ncx,y:ncy};
+      }
+    }else if(!anchors[pid]) anchors[pid]={x:0.5,y:0.4};
+  });
+  // Clean up anchors for removed persons
+  for(const pid in anchors){ if(!allDrowning.has(Number(pid))) delete anchors[pid]; }
+
+  // Hide section when no drowning
+  if(!allDrowning.size || (state!=='ALARM'&&state!=='RESCUE')){
+    section.style.display='none';
+    overlay.innerHTML='';
+    list.innerHTML='';
+    _lastDrownStatus=null;
+    const mp=document.getElementById('mobile-drown');if(mp)mp.innerHTML='';
+    return;
+  }
+  section.style.display='';
+
+  // Build a status key to detect changes
+  const statusKey=[...allDrowning].sort().map(p=>p+':'+(locked.has(p)?'L':'M')).join(',');
+  if(statusKey===_lastDrownStatus) return;
+  _lastDrownStatus=statusKey;
+
+  // Rebuild the side panel list
+  list.innerHTML='';
+  allDrowning.forEach(pid=>{
+    const isLocked=locked.has(pid);
+    const entry=document.createElement('div');
+    entry.className='drown-entry'+(isLocked?' locked':'');
+    entry.dataset.pid=String(pid);
+    if(isLocked){
+      entry.innerHTML=`<div class="de-head">
+          <span class="de-name">🚁 Person #${pid}</span>
+          <span class="de-status" style="color:var(--orange)">Rettung läuft</span>
+        </div>`;
+    }else{
+      entry.innerHTML=`<div class="de-head">
+          <span class="de-name">🚨 Person #${pid}</span>
+          <span class="de-status">Ertrinken erkannt</span>
+        </div>
+        <div class="de-actions">
+          <button class="de-yes" onclick="event.stopPropagation();confirmPerson(${pid})">✅ Bestätigen</button>
+          <button class="de-no" onclick="event.stopPropagation();dismissPerson(${pid})">❌ Fehlalarm</button>
+        </div>`;
+    }
+    // Hover → show highlight ring on video
+    entry.addEventListener('mouseenter',()=>showPersonHighlight(pid,isLocked));
+    entry.addEventListener('mouseleave',()=>hidePersonHighlight());
+    // Touch: toggle on tap
+    entry.addEventListener('touchstart',e=>{
+      e.preventDefault();showPersonHighlight(pid,isLocked);
+      setTimeout(hidePersonHighlight,2000);
+    },{passive:false});
+    list.appendChild(entry);
+  });
+
+  // Mobile: clone entries into floating panel above bottom bar
+  let mp=document.getElementById('mobile-drown');
+  if(!mp){
+    mp=document.createElement('div');mp.id='mobile-drown';mp.className='mobile-drown';
+    document.getElementById('screen-main').appendChild(mp);
+  }
+  mp.innerHTML=list.innerHTML;
+}
+
+function showPersonHighlight(pid,isLocked){
+  hidePersonHighlight();
+  const a=anchors[pid]; if(!a) return;
+  const overlay=document.getElementById('person-overlays');
+  const img=document.getElementById('video-stream');
+  const area=document.getElementById('video-area');
+  const cRect=area.getBoundingClientRect();
+  const imgRect=img.getBoundingClientRect();
+  const frameW=img.naturalWidth||1; const frameH=img.naturalHeight||1;
+  const useW=imgRect.width||cRect.width; const useH=imgRect.height||cRect.height;
+  const scale=Math.min(useW/frameW,useH/frameH);
+  const rendW=frameW*scale; const rendH=frameH*scale;
+  const offX=(useW-rendW)/2+imgRect.left-cRect.left;
+  const offY=(useH-rendH)/2+imgRect.top-cRect.top;
+  const ring=document.createElement('div');
+  ring.className='person-highlight'+(isLocked?' locked':'');
+  ring.id='person-hl-active';
+  ring.style.left=(offX+a.x*rendW)+'px';
+  ring.style.top=(offY+a.y*rendH)+'px';
+  // Add label
+  const lbl=document.createElement('span');
+  lbl.style.cssText='position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;color:#ff4455;white-space:nowrap;text-shadow:0 0 4px #000';
+  if(isLocked){lbl.style.color='var(--orange)';}
+  lbl.textContent='Person #'+pid;
+  ring.appendChild(lbl);
+  overlay.appendChild(ring);
+}
+function hidePersonHighlight(){
+  const el=document.getElementById('person-hl-active');
+  if(el) el.remove();
+}
+
+async function confirmPerson(pid){
+  closeSensPopup();
+  _lastDrownStatus=null; // force rebuild
+  await apiPost('/api/confirm_person',{pid});
+}
+async function dismissPerson(pid){
+  closeSensPopup();
+  _lastDrownStatus=null; // force rebuild
+  await apiPost('/api/dismiss',{pid});
+  delete anchors[pid];
+}
+
+// ── VIDEO CLICK → SENSITIVITY ────────────────────────────────────────────────
+async function _handleVideoClick(xn,yn,event){
+  closeSensPopup();
+  try{
+    const r=await apiPost('/api/click',{x:xn,y:yn});
+    if(r.pid!==null&&r.pid!==undefined){
+      const cRect=document.getElementById('video-area').getBoundingClientRect();
+      showSensPopup(r.pid,r.sensitivity||1.0,
+        event.clientX-cRect.left,event.clientY-cRect.top);
+    }
+  }catch(e){}
+}
+// legacy inline handler (kept for compatibility)
+function onVideoClick(event){ /* handled via area click listener */ }
+
+function showSensPopup(pid,cur,px,py){
+  closeSensPopup();
+  const container=document.getElementById('sens-popup-container');
+  const curTxt=cur===1.0?'Normal':(cur<1.0?'Genauer':'Weniger');
+  const div=document.createElement('div');
+  div.className='sens-popup';div.id='sens-popup';
+  div.innerHTML=`
+    <div class="title">Person #${pid}</div>
+    <div class="current">Aktuell: ${curTxt}</div>
+    <button style="background:#004466" onclick="setSensitivity(${pid},0.5)">🔍 Genauer beobachten</button>
+    <button style="background:#444400" onclick="setSensitivity(${pid},2.0)">😌 Weniger beobachten</button>
+    <button style="background:#1a1a40" onclick="setSensitivity(${pid},1.0)">↩ Normal</button>
+    <button style="background:transparent;color:var(--muted);font-size:11px"
+            onclick="closeSensPopup()">✕ Schließen</button>`;
+  const area=document.getElementById('video-area');
+  const maxX=area.clientWidth-190;const maxY=area.clientHeight-200;
+  div.style.left=Math.max(0,Math.min(px-70,maxX))+'px';
+  div.style.top=Math.max(0,Math.min(py-10,maxY))+'px';
+  container.appendChild(div);
+}
+function closeSensPopup(){
+  const el=document.getElementById('sens-popup');
+  if(el) el.remove();
+}
+async function setSensitivity(pid,mult){
+  closeSensPopup();
+  await apiPost('/api/sensitivity',{pid,mult});
+}
+
+// ── SYSTEM SHUTDOWN ──────────────────────────────────────────────────────────
+async function shutdownSystem(){
+  if(!confirm('System komplett herunterfahren?')) return;
+  await apiPost('/api/shutdown');
+  document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#556677;font-size:20px">⏻&ensp;System wurde beendet. Fenster kann geschlossen werden.</div>';
+}
+
+// ── DRONE CONTROLS ───────────────────────────────────────────────────────────
+async function droneStop(){await apiPost('/api/drone/stop');}
+async function arucoReset(){await apiPost('/api/drone/aruco_reset');}
+
+// ── LOGBOOK ──────────────────────────────────────────────────────────────────
+let logEntries=[];
+async function renderLogbook(){
+  try{logEntries=await apiGet('/api/log');}catch(e){logEntries=[];}
+  const filterEl=document.getElementById('log-filter');
+  const filter=filterEl?filterEl.value:'Alle';
+  const mapping={Alle:null,Alarme:['ALARM'],Fehlalarme:['FEHLALARM'],
+    Rettungen:['RETTUNG_BESTAETIGT','RETTUNG_FERTIG'],System:['SYSTEM_START','SYSTEM_STOP']};
+  const allowed=mapping[filter]||null;
+  const filtered=allowed?logEntries.filter(e=>allowed.includes(e.type)):logEntries;
+  document.getElementById('log-count').textContent=
+    `${filtered.length} von ${logEntries.length} Einträgen`;
+  const body=document.getElementById('log-body');
+  if(!filtered.length){body.innerHTML='<p style="text-align:center;padding:40px;color:var(--muted)">Keine Einträge</p>';return;}
+  let html='<table class="log-table"><thead><tr><th>Zeit</th><th>Typ</th><th>Details</th><th>Person</th></tr></thead><tbody>';
+  for(let i=filtered.length-1;i>=0;i--){
+    const e=filtered[i];
+    const st=EVT[e.type]||{color:'var(--muted)',icon:'•',label:e.type};
+    const gps=(e.gps&&e.gps.lat!=null)?`📍 ${Number(e.gps.lat).toFixed(5)}, ${Number(e.gps.lon).toFixed(5)}`:'';
+    html+=`<tr><td style="white-space:nowrap">${e.ts||''}</td>
+      <td><span style="color:${st.color}">${st.icon} ${st.label}</span></td>
+      <td>${e.details||''}${gps?' <small style="color:#556677">'+gps+'</small>':''}</td>
+      <td>${e.person_id!=null?'#'+e.person_id:''}</td></tr>`;
+  }
+  html+='</tbody></table>';
+  body.innerHTML=html;
+}
+async function clearLog(){
+  if(!confirm('Gesamtes Logbuch löschen?')) return;
+  await apiPost('/api/log/clear');renderLogbook();
+}
+function exportLogCsv(){
+  let csv='Zeitstempel;Typ;Details;Person-ID;GPS-Lat;GPS-Lon;Personen\n';
+  logEntries.forEach(e=>{
+    const gps=e.gps||{};
+    csv+=`${e.ts||''};${e.type||''};${e.details||''};${e.person_id||''};${gps.lat||''};${gps.lon||''};${e.persons_count||''}\n`;
+  });
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='saver_logbuch_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+// ── STATS ────────────────────────────────────────────────────────────────────
+async function renderStats(){
+  let entries=[];
+  try{entries=await apiGet('/api/log');}catch(e){}
+  const range=document.getElementById('stats-range').value;
+  const now=new Date();
+  if(range==='Heute'){
+    const tag=now.toISOString().slice(0,10);
+    entries=entries.filter(e=>(e.ts||'').startsWith(tag));
+  }else if(range==='7 Tage'){
+    const cutoff=new Date(now-7*86400000).toISOString().slice(0,19).replace('T',' ');
+    entries=entries.filter(e=>(e.ts||'')>=cutoff);
+  }else if(range==='30 Tage'){
+    const cutoff=new Date(now-30*86400000).toISOString().slice(0,19).replace('T',' ');
+    entries=entries.filter(e=>(e.ts||'')>=cutoff);
+  }
+  const nAlarm=entries.filter(e=>e.type==='ALARM').length;
+  const nFalse=entries.filter(e=>e.type==='FEHLALARM').length;
+  const nRescue=entries.filter(e=>e.type==='RETTUNG_FERTIG').length;
+  const nConfirm=entries.filter(e=>e.type==='RETTUNG_BESTAETIGT').length;
+  const falseRate=nAlarm>0?(nFalse/nAlarm*100):0;
+  const rateColor=falseRate<30?'var(--green)':(falseRate<60?'var(--orange)':'var(--red)');
+  const persArr=entries.filter(e=>e.type==='ALARM'&&e.persons_count).map(e=>e.persons_count);
+  const avgP=persArr.length?(persArr.reduce((a,b)=>a+b,0)/persArr.length):0;
+  let html=`<div class="kpi-row">
+    <div class="kpi"><div class="val" style="color:var(--red)">${nAlarm}</div><div class="lbl">Alarme</div></div>
+    <div class="kpi"><div class="val" style="color:${rateColor}">${falseRate.toFixed(0)}%</div><div class="lbl">Fehlalarm-Quote</div></div>
+    <div class="kpi"><div class="val" style="color:var(--green)">${nRescue}</div><div class="lbl">Rettungen</div></div>
+    <div class="kpi"><div class="val" style="color:var(--blue)">${avgP.toFixed(1)}</div><div class="lbl">⌀ Personen</div></div>
+    <div class="kpi"><div class="val" style="color:#8888cc">${nConfirm}</div><div class="lbl">Bestätigt</div></div>
+  </div>`;
+  // Bar chart
+  const alarmE=entries.filter(e=>['ALARM','FEHLALARM','RETTUNG_FERTIG'].includes(e.type));
+  if(alarmE.length){
+    const counts={};alarmE.forEach(e=>{const d=(e.ts||'').slice(0,10);counts[d]=(counts[d]||0)+1;});
+    const dates=Object.keys(counts).sort();
+    const maxVal=Math.max(...dates.map(d=>counts[d]),1);
+    html+='<h3 style="font-size:13px;color:var(--text);margin:12px 0 8px">Alarme pro Tag</h3>';
+    html+='<div class="bar-chart">';
+    dates.forEach(d=>{
+      const h=Math.max(4,(counts[d]/maxVal)*130);
+      html+=`<div class="bar" style="height:${h}px" title="${d}: ${counts[d]}"><span>${d.slice(5)}</span></div>`;
+    });
+    html+='</div>';
+  }
+  // Distribution table
+  html+=`<h3 style="font-size:13px;color:var(--text);margin:20px 0 8px">Alarm-Verteilung</h3>
+    <table class="log-table"><tbody>
+    <tr><td style="color:var(--red)">Alarme (netto)</td><td>${Math.max(0,nAlarm-nFalse)}</td></tr>
+    <tr><td style="color:#888">Fehlalarme</td><td>${nFalse}</td></tr>
+    <tr><td style="color:var(--orange)">Rettungen bestätigt</td><td>${nConfirm}</td></tr>
+    <tr><td style="color:var(--green)">Rettungen abgeschlossen</td><td>${nRescue}</td></tr>
+    </tbody></table>`;
+  document.getElementById('stats-body').innerHTML=html;
+}
+async function clearStats(){
+  if(!confirm('Gesamte Statistik löschen?')) return;
+  await apiPost('/api/log/clear');renderStats();
+}
+
+// ── SETTINGS MODAL ───────────────────────────────────────────────────────────
+function toggleSetGps(){
+  document.getElementById('set-gps-fields').style.display=
+    document.getElementById('set-gps').checked?'block':'none';
+}
+function loadSettingsModal(){
+  // Sensitivity
+  const radios=document.querySelectorAll('input[name="set-sens"]');
+  radios.forEach(r=>r.checked=(r.value===currentSens));
+  // All other fields from savedConfig
+  const cfg=savedConfig||{};
+  const camEl=document.getElementById('set-cam');
+  if(camEl) camEl.value=cfg.cam||'Hauptkamera';
+  const gpsEl=document.getElementById('set-gps');
+  if(gpsEl){ gpsEl.checked=!!cfg.use_gps; toggleSetGps(); }
+  if(cfg.lat1) document.getElementById('set-lat1').value=cfg.lat1;
+  if(cfg.lon1) document.getElementById('set-lon1').value=cfg.lon1;
+  if(cfg.lat2) document.getElementById('set-lat2').value=cfg.lat2;
+  if(cfg.lon2) document.getElementById('set-lon2').value=cfg.lon2;
+  const atEl=document.getElementById('set-autotakeoff');
+  if(atEl) atEl.checked=cfg.auto_takeoff!==false;
+  const trEl=document.getElementById('set-training');
+  if(trEl) trEl.checked=!!cfg.collect_training;
+  const sPicoEl=document.getElementById('set-pico-ip');
+  if(sPicoEl) sPicoEl.value=cfg.pico_ip||'';
+  updateZoneStatus();
+}
+async function applySettings(){
+  const sens=document.querySelector('input[name="set-sens"]:checked');
+  if(sens) currentSens=sens.value;
+  // Build updated config
+  const cfg=Object.assign({},savedConfig||{},{
+    cam: document.getElementById('set-cam').value,
+    sens: currentSens,
+    use_gps: document.getElementById('set-gps').checked,
+    auto_takeoff: document.getElementById('set-autotakeoff').checked,
+    collect_training: document.getElementById('set-training').checked,
+    lat1: document.getElementById('set-lat1').value||'0',
+    lon1: document.getElementById('set-lon1').value||'0',
+    lat2: document.getElementById('set-lat2').value||'0',
+    lon2: document.getElementById('set-lon2').value||'0',
+    exclusion_zones: exclusionZones,
+    pico_ip: document.getElementById('set-pico-ip').value.trim(),
+  });
+  savedConfig=cfg;
+  await apiPost('/api/settings',{sensitivity:currentSens,exclusion_zones:exclusionZones,pico_ip:document.getElementById('set-pico-ip').value.trim()});
+  closeModal('settings');
+}
+
+// ── ZONE EDITOR ──────────────────────────────────────────────────────────────
+let zoneDrawing=false,zoneStartX=0,zoneStartY=0;
+let zoneImgRect={x:0,y:0,w:1,h:1};
+
+function _finishZoneDraw(endX,endY){
+  const n1=canvasToNorm(zoneStartX,zoneStartY);
+  const n2=canvasToNorm(endX,endY);
+  const x1=Math.min(n1.x,n2.x),y1=Math.min(n1.y,n2.y);
+  const x2=Math.max(n1.x,n2.x),y2=Math.max(n1.y,n2.y);
+  if(x2-x1>0.02&&y2-y1>0.02) exclusionZones.push([x1,y1,x2,y2]);
+  drawZones();
+  document.getElementById('zone-count').textContent=
+    exclusionZones.length?`${exclusionZones.length} Zone(n) definiert`:'Keine Zonen definiert';
+}
+
+async function openZoneEditor(){
+  openModal('zones');
+  const img=document.getElementById('zone-img');
+  const isRunning=document.getElementById('screen-main').classList.contains('active');
+  if(isRunning){
+    // Live stream als Hintergrund
+    img.onload=()=>{ img.onload=null; setupZoneCanvas(); };
+    img.src='/stream';
+  } else {
+    // Noch nicht gestartet – Snapshot der gewählten Kamera
+    const camMap={'Hauptkamera':0,'Kamera 2':1,'Kamera 3':2};
+    const cam=document.getElementById('cfg-cam')?document.getElementById('cfg-cam').value:'Hauptkamera';
+    img.src='/api/snapshot?cam='+(camMap[cam]||0)+'&t='+Date.now();
+    img.onload=()=>setupZoneCanvas();
+  }
+  document.getElementById('zone-count').textContent=
+    exclusionZones.length?`${exclusionZones.length} Zone(n) definiert`:'Keine Zonen definiert';
+}
+function setupZoneCanvas(){
+  const img=document.getElementById('zone-img');
+  const canvas=document.getElementById('zone-canvas');
+  const wrap=document.getElementById('zone-canvas-wrap');
+  const ww=wrap.clientWidth,wh=wrap.clientHeight;
+  const nw=img.naturalWidth,nh=img.naturalHeight;
+  const scale=Math.min(ww/nw,wh/nh);
+  const rw=Math.floor(nw*scale),rh=Math.floor(nh*scale);
+  const rx=(ww-rw)/2,ry=(wh-rh)/2;
+  zoneImgRect={x:rx,y:ry,w:rw,h:rh};
+  canvas.width=ww;canvas.height=wh;
+  // Mouse events
+  canvas.onmousedown=e=>{zoneDrawing=true;zoneStartX=e.offsetX;zoneStartY=e.offsetY;};
+  canvas.onmousemove=e=>{if(zoneDrawing) drawZones(e.offsetX,e.offsetY);};
+  canvas.onmouseup=e=>{
+    if(!zoneDrawing) return;zoneDrawing=false;
+    _finishZoneDraw(e.offsetX,e.offsetY);
+  };
+  // Touch events (tablet support)
+  canvas.ontouchstart=e=>{
+    e.preventDefault();const t=e.touches[0];const cr=canvas.getBoundingClientRect();
+    zoneDrawing=true;zoneStartX=t.clientX-cr.left;zoneStartY=t.clientY-cr.top;
+  };
+  canvas.ontouchmove=e=>{
+    e.preventDefault();if(!zoneDrawing)return;const t=e.touches[0];const cr=canvas.getBoundingClientRect();
+    drawZones(t.clientX-cr.left,t.clientY-cr.top);
+  };
+  canvas.ontouchend=e=>{
+    e.preventDefault();if(!zoneDrawing)return;zoneDrawing=false;
+    const t=e.changedTouches[0];const cr=canvas.getBoundingClientRect();
+    _finishZoneDraw(t.clientX-cr.left,t.clientY-cr.top);
+  };
+  canvas.oncontextmenu=e=>{
+    e.preventDefault();
+    const n=canvasToNorm(e.offsetX,e.offsetY);
+    for(let i=0;i<exclusionZones.length;i++){
+      const z=exclusionZones[i];
+      if(n.x>=z[0]&&n.x<=z[2]&&n.y>=z[1]&&n.y<=z[3]){
+        exclusionZones.splice(i,1);drawZones();
+        document.getElementById('zone-count').textContent=
+          exclusionZones.length?`${exclusionZones.length} Zone(n) definiert`:'Keine Zonen definiert';
+        break;
+      }
+    }
+  };
+  drawZones();
+}
+function canvasToNorm(cx,cy){
+  return{
+    x:Math.max(0,Math.min(1,(cx-zoneImgRect.x)/zoneImgRect.w)),
+    y:Math.max(0,Math.min(1,(cy-zoneImgRect.y)/zoneImgRect.h))
+  };
+}
+function drawZones(mx,my){
+  const canvas=document.getElementById('zone-canvas');
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const r=zoneImgRect;
+  exclusionZones.forEach(z=>{
+    const x=r.x+z[0]*r.w, y=r.y+z[1]*r.h;
+    const w=(z[2]-z[0])*r.w, h=(z[3]-z[1])*r.h;
+    ctx.fillStyle='rgba(255,0,0,0.25)';ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle='#ff4444';ctx.lineWidth=2;ctx.strokeRect(x,y,w,h);
+    ctx.fillStyle='#ff4444';ctx.font='12px Segoe UI';
+    ctx.fillText('KEINE ERKENNUNG',x+4,y+16);
+  });
+  if(zoneDrawing&&mx!==undefined){
+    ctx.setLineDash([5,3]);ctx.strokeStyle='#ff6666';ctx.lineWidth=2;
+    ctx.strokeRect(zoneStartX,zoneStartY,mx-zoneStartX,my-zoneStartY);
+    ctx.setLineDash([]);
+  }
+}
+function clearAllZones(){
+  exclusionZones=[];drawZones();
+  document.getElementById('zone-count').textContent='Keine Zonen definiert';
+}
+async function saveZones(){
+  updateZoneStatus();
+  await apiPost('/api/zones',{zones:exclusionZones});
+  document.getElementById('zone-img').removeAttribute('src');
+  closeModal('zones');
+}
+function closeZoneEditor(){
+  updateZoneStatus();
+  document.getElementById('zone-img').removeAttribute('src');
+  closeModal('zones');
+}
+
+// ── GPS CLIPBOARD ─────────────────────────────────────────────────────────────
+let _lastGpsClip=0;
+function _updateGpsClipboard(s){
+  if(!s.use_gps) return;
+  if(s.state!=='ALARM'&&s.state!=='RESCUE') return;
+  if(!s.alarm_lat && !s.alarm_lon) return;
+  const now=Date.now();
+  if(now-_lastGpsClip<5000) return;
+  _lastGpsClip=now;
+  const txt=`${Number(s.alarm_lat).toFixed(6)}, ${Number(s.alarm_lon).toFixed(6)}`;
+  navigator.clipboard.writeText(txt).then(()=>{
+    const toast=document.getElementById('gps-toast');
+    toast.textContent=`📍 GPS kopiert: ${txt}`;
+    toast.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t=setTimeout(()=>toast.classList.remove('show'),2000);
+  }).catch(()=>{});
+}
+
+// ── ZOOM / PAN ───────────────────────────────────────────────────────────────
+let _zoom=1.0, _panX=0, _panY=0;
+const ZOOM_MIN=1.0, ZOOM_MAX=8.0;
+let _zoomIndicatorTimer=null;
+
+function _applyTransform(){
+  document.getElementById('zoom-wrap').style.transform=
+    `translate(${_panX}px,${_panY}px) scale(${_zoom})`;
+  const area=document.getElementById('video-area');
+  area.classList.toggle('zoomed',_zoom>1.001);
+  // Show zoom indicator
+  const ind=document.getElementById('zoom-indicator');
+  ind.textContent=_zoom.toFixed(1)+'×';
+  ind.classList.add('visible');
+  clearTimeout(_zoomIndicatorTimer);
+  _zoomIndicatorTimer=setTimeout(()=>ind.classList.remove('visible'),1200);
+  if(_gridVisible) drawGrid();
+}
+function _clampPan(){
+  if(_zoom<=1.001){_panX=0;_panY=0;return;}
+  const a=document.getElementById('video-area');
+  const mx=(a.clientWidth*(_zoom-1))/2;
+  const my=(a.clientHeight*(_zoom-1))/2;
+  _panX=Math.max(-mx,Math.min(mx,_panX));
+  _panY=Math.max(-my,Math.min(my,_panY));
+}
+function _zoomAt(cx,cy,factor){
+  const rect=document.getElementById('video-area').getBoundingClientRect();
+  const ax=cx-rect.left, ay=cy-rect.top;
+  const nz=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,_zoom*factor));
+  const zf=nz/_zoom;
+  _panX=ax-(ax-_panX)*zf;
+  _panY=ay-(ay-_panY)*zf;
+  _zoom=nz;
+  _clampPan();
+  _applyTransform();
+}
+function resetZoom(){_zoom=1;_panX=0;_panY=0;_applyTransform();}
+
+// Mouse wheel
+function _initZoomEvents(){
+  const area=document.getElementById('video-area');
+  // Scroll zoom
+  area.addEventListener('wheel',e=>{
+    e.preventDefault();
+    _zoomAt(e.clientX,e.clientY,e.deltaY<0?1.15:1/1.15);
+  },{passive:false});
+  // Double-click reset
+  area.addEventListener('dblclick',e=>{
+    if(_zoom>1.001) resetZoom();
+    else _zoomAt(e.clientX,e.clientY,2);
+  });
+  // Mouse drag (pan)
+  let _md=false, _mds=null;
+  area.addEventListener('mousedown',e=>{
+    if(e.button!==0||_zoom<=1.001) return;
+    _md=true; _mds={x:e.clientX,y:e.clientY,px:_panX,py:_panY};
+    area.classList.add('panning');
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!_md||!_mds) return;
+    _panX=_mds.px+(e.clientX-_mds.x);
+    _panY=_mds.py+(e.clientY-_mds.y);
+    _clampPan(); _applyTransform();
+  });
+  window.addEventListener('mouseup',()=>{
+    _md=false; _mds=null;
+    document.getElementById('video-area').classList.remove('panning');
+  });
+  // Touch: pinch + pan
+  let _tpts={}, _lpd=null, _ltc=null, _tds=null;
+  area.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    for(const t of e.changedTouches) _tpts[t.identifier]={x:t.clientX,y:t.clientY};
+    const pts=Object.values(_tpts);
+    if(pts.length>=2){
+      _lpd=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+      _ltc={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+    } else {
+      _tds={x:e.touches[0].clientX,y:e.touches[0].clientY,px:_panX,py:_panY};
+    }
+  },{passive:false});
+  area.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    for(const t of e.changedTouches) _tpts[t.identifier]={x:t.clientX,y:t.clientY};
+    const pts=Object.values(_tpts);
+    if(pts.length>=2){
+      const d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+      const cx=(pts[0].x+pts[1].x)/2, cy=(pts[0].y+pts[1].y)/2;
+      if(_lpd) _zoomAt(cx,cy,d/_lpd);
+      if(_ltc){
+        _panX+=cx-_ltc.x; _panY+=cy-_ltc.y;
+        _clampPan(); _applyTransform();
+      }
+      _lpd=d; _ltc={x:cx,y:cy};
+    } else if(pts.length===1 && _tds && _zoom>1.001){
+      _panX=_tds.px+(e.touches[0].clientX-_tds.x);
+      _panY=_tds.py+(e.touches[0].clientY-_tds.y);
+      _clampPan(); _applyTransform();
+    }
+  },{passive:false});
+  area.addEventListener('touchend',e=>{
+    for(const t of e.changedTouches) delete _tpts[t.identifier];
+    if(Object.keys(_tpts).length<2){_lpd=null;_ltc=null;}
+    if(Object.keys(_tpts).length===0){
+      _tds=null;
+      // Snap-back: Zoom nur solange halten wie Finger auf Screen → beim Loslassen zurücksetzen
+      resetZoom();
+    }
+  });
+  // Click on video → send to backend (only if not dragging)
+  area.addEventListener('click',e=>{
+    if(_md) return; // was a drag
+    const img=document.getElementById('video-stream');
+    if(!img.naturalWidth) return;
+    const rect=img.getBoundingClientRect();
+    const scale=Math.min(rect.width/img.naturalWidth,rect.height/img.naturalHeight);
+    const rendW=img.naturalWidth*scale, rendH=img.naturalHeight*scale;
+    const ox=rect.left+(rect.width-rendW)/2;
+    const oy=rect.top+(rect.height-rendH)/2;
+    const xn=(e.clientX-ox)/rendW, yn=(e.clientY-oy)/rendH;
+    if(xn<0||xn>1||yn<0||yn>1) return;
+    _handleVideoClick(xn, yn, e);
+  });
+}
+
+// ── PLANNING GRID ────────────────────────────────────────────────────────────
+let _gridVisible=false;
+function toggleGrid(){
+  _gridVisible=!_gridVisible;
+  const c=document.getElementById('grid-canvas');
+  const btn=document.getElementById('grid-toggle-btn');
+  c.style.display=_gridVisible?'block':'none';
+  btn.style.color=_gridVisible?'var(--blue)':'#667788';
+  if(_gridVisible) drawGrid();
+}
+function drawGrid(){
+  const c=document.getElementById('grid-canvas');
+  const area=document.getElementById('video-area');
+  const img=document.getElementById('video-stream');
+  // Draw in natural (1x) coordinate space — CSS transform scales visually
+  const W=area.clientWidth, H=area.clientHeight;
+  c.width=W; c.height=H;
+  const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  if(!img.naturalWidth) return;
+  const s=Math.min(W/img.naturalWidth,H/img.naturalHeight);
+  const rW=img.naturalWidth*s, rH=img.naturalHeight*s;
+  const oX=(W-rW)/2, oY=(H-rH)/2;
+  const COLS=8, ROWS=6;
+  const cw=rW/COLS, ch=rH/ROWS;
+  // Line thickness stays visually ~1px regardless of zoom
+  ctx.strokeStyle='rgba(0,180,255,0.35)';
+  ctx.lineWidth=1/_zoom;
+  const fs=Math.round(11/_zoom);
+  ctx.font=`bold ${fs}px Segoe UI,sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(let i=0;i<=COLS;i++){
+    const x=oX+i*cw;
+    ctx.beginPath();ctx.moveTo(x,oY);ctx.lineTo(x,oY+rH);ctx.stroke();
+    if(i<COLS){
+      const lx=oX+i*cw+cw/2;
+      const lw=Math.max(14,20/_zoom), lh=Math.max(12,16/_zoom);
+      ctx.fillStyle='rgba(0,180,255,0.9)';
+      ctx.fillRect(lx-lw/2,oY+2/_zoom,lw,lh);
+      ctx.fillStyle='#000';
+      ctx.fillText(String.fromCharCode(65+i),lx,oY+2/_zoom+lh/2);
+    }
+  }
+  for(let r=0;r<=ROWS;r++){
+    const y=oY+r*ch;
+    ctx.beginPath();ctx.moveTo(oX,y);ctx.lineTo(oX+rW,y);ctx.stroke();
+    if(r<ROWS){
+      const ly=oY+r*ch+ch/2;
+      const lw=Math.max(14,18/_zoom), lh=Math.max(12,16/_zoom);
+      ctx.fillStyle='rgba(0,180,255,0.9)';
+      ctx.fillRect(oX+2/_zoom,ly-lh/2,lw,lh);
+      ctx.fillStyle='#000';
+      ctx.fillText(String(r+1),oX+2/_zoom+lw/2,ly);
+    }
+  }
+}
+window.addEventListener('resize',()=>{ if(_gridVisible) drawGrid(); });
+
+// ── QR MODAL HELPERS ─────────────────────────────────────────────────────────
+function openQrModal(){
+  const url = location.origin;
+  document.getElementById('qr-url').textContent = url;
+  const wrap = document.getElementById('qr-canvas-wrap');
+  wrap.innerHTML = '';
+  new QRCode(wrap, {
+    text: url, width: 200, height: 200,
+    colorDark:'#000000', colorLight:'#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  // Hide share button if Web Share API not available
+  const shareBtn = document.getElementById('qr-share-btn');
+  if(!navigator.share) shareBtn.style.display='none';
+  else shareBtn.style.display='';
+}
+async function shareQrUrl(){
+  const url = location.origin;
+  try{
+    await navigator.share({title:'S.A.V.E.R Remote', text:'S.A.V.E.R Handy-Remote öffnen:', url});
+  }catch(e){
+    if(e.name!=='AbortError') copyQrUrl();
+  }
+}
+function copyQrUrl(){
+  const url = location.origin;
+  navigator.clipboard.writeText(url).then(()=>{
+    const btn = document.getElementById('qr-copy-btn');
+    const old = btn.textContent;
+    btn.textContent = '✓';
+    setTimeout(()=>btn.textContent=old, 1500);
+  }).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=url; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  });
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  initHome();
+  _initZoomEvents();
+  // Update clock every second even when not polling
+  setInterval(()=>{
+    const el=document.getElementById('clock');
+    if(el&&document.getElementById('screen-main').classList.contains('active')){
+      el.textContent=new Date().toLocaleTimeString('de-DE');
+    }
+  },1000);
+});
+</script>
+</body>
+</html>

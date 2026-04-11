@@ -170,6 +170,10 @@ g = dict(
     drone_marker_pixel_size=None,
     drone_frame_seq=0,           # Frame-Sequenznummer – backend inkrementiert, nav-thread wartet auf neuen Frame
     drone_aruco_visible=False,   # True nur wenn Marker im AKTUELLEN Frame erkannt – verhindert Navigation mit veralteten Buffer-Positionen
+    # Web-Remote
+    ui_screenshot=None,
+    ui_win_pos=(0, 0),
+    ui_win_size=(1400, 860),
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -378,7 +382,7 @@ def alarm_sound():
         pygame.mixer.init()
         pygame.mixer.music.load(alarm_path)
         print(f"[ALARM] pygame.mixer aktiviert: {alarm_path}")
-        while g["state"] == "ALARM":
+        while g["state"] in ("ALARM", "RESCUE"):
             if not pygame.mixer.music.get_busy():
                 pygame.mixer.music.play()
             time.sleep(0.1)
@@ -391,7 +395,7 @@ def alarm_sound():
         import ctypes
         winmm = ctypes.windll.winmm
         print(f"[ALARM] Windows API (mciSendString) aktiviert: {alarm_path}")
-        while g["state"] == "ALARM":
+        while g["state"] in ("ALARM", "RESCUE"):
             try:
                 winmm.mciSendStringW(f'open "{alarm_path}" type mpegvideo alias alarm', None, 0, 0)
                 winmm.mciSendStringW('play alarm', None, 0, 0)
@@ -406,7 +410,7 @@ def alarm_sound():
     # Fallback: os.startfile() - startet MP3 im Standard-Player
     try:
         print(f"[ALARM] os.startfile() aktiviert: {alarm_path}")
-        while g["state"] == "ALARM":
+        while g["state"] in ("ALARM", "RESCUE"):
             try:
                 os.startfile(alarm_path)
                 time.sleep(5)
@@ -420,7 +424,7 @@ def alarm_sound():
     if _HAS_WINSOUND:
         print("[ALARM] Fallback auf Beep-System")
         try:
-            while g["state"] == "ALARM":
+            while g["state"] in ("ALARM", "RESCUE"):
                 winsound.Beep(2200, 600)
                 time.sleep(0.03)
                 winsound.Beep(700, 600)
