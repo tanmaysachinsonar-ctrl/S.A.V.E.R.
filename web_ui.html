@@ -6,251 +6,757 @@
 <title>S.A.V.E.R DRONE</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
+/* ═══════════════════════════════════════════════
+   S.A.V.E.R  –  Apple Liquid Glass  (iOS 26 / macOS Tahoe)
+   Alle IDs & Klassen unverändert – nur Optik neu
+   ═══════════════════════════════════════════════ */
+
+/* ── Reset & Base ── */
+*{margin:0;padding:0;box-sizing:border-box;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+
 :root{
-  --bg:#151620;--panel:#1a1a2e;--card:#141428;
-  --green:#00cc30;--red:#ff0015;--orange:#ff8800;--blue:#0088ff;
-  --text:#ccccee;--muted:#445566;--border:#1a1a33;--logo:#5a5a7a;
+  /* ── Liquid Glass Palette ── */
+  --bg: linear-gradient(145deg, #e8eef5 0%, #dde5ef 40%, #e2e8f2 100%);
+  --bg-solid: #e4eaf2;
+
+  /* Glass surfaces */
+  --glass-white:   rgba(255,255,255,0.55);
+  --glass-frost:   rgba(255,255,255,0.38);
+  --glass-thin:    rgba(255,255,255,0.22);
+  --glass-card:    rgba(255,255,255,0.60);
+  --glass-modal:   rgba(248,250,253,0.72);
+  --glass-topbar:  rgba(255,255,255,0.62);
+  --glass-sidebar: rgba(240,244,250,0.70);
+  --glass-btn:     rgba(255,255,255,0.50);
+
+  /* Inner glow / specular highlight */
+  --specular: inset 0 1px 0 rgba(255,255,255,0.85),
+              inset 0 -1px 0 rgba(0,0,0,0.04);
+  --specular-strong: inset 0 1.5px 0 rgba(255,255,255,0.90),
+                     inset 1px 0 0 rgba(255,255,255,0.30),
+                     inset -1px 0 0 rgba(255,255,255,0.20),
+                     inset 0 -1px 0 rgba(0,0,0,0.06);
+
+  /* Labels */
+  --text:  #1a1a1f;
+  --text2: #3a3a44;
+  --muted: #7a7a88;
+  --muted4:rgba(60,60,70,.14);
+
+  /* System accent colors */
+  --blue:   #0076FF;
+  --green:  #30C754;
+  --red:    #FF3730;
+  --orange: #FF9600;
+  --indigo: #5856DA;
+  --teal:   #36BBEF;
+
+  /* Borders */
+  --border:     rgba(120,130,160,0.28);
+  --border-top: rgba(255,255,255,0.75);
+  --sep:        rgba(100,110,140,0.14);
+
+  /* Shadows */
+  --shadow-sm:  0 2px 8px rgba(40,50,80,0.10), 0 1px 3px rgba(40,50,80,0.06);
+  --shadow-md:  0 6px 24px rgba(40,50,80,0.13), 0 2px 6px rgba(40,50,80,0.07);
+  --shadow-lg:  0 16px 56px rgba(40,50,80,0.18), 0 4px 12px rgba(40,50,80,0.09);
+  --shadow-glass: 0 8px 32px rgba(40,50,80,0.15),
+                  0 1px 0 rgba(255,255,255,0.80) inset,
+                  0 -1px 0 rgba(0,0,0,0.06) inset;
+
+  /* Geometry */
+  --r-sm:8px;--r-md:14px;--r-lg:18px;--r-xl:24px;--r-2xl:30px;
+
+  /* Blur levels */
+  --blur-sm:  blur(12px) saturate(160%);
+  --blur-md:  blur(24px) saturate(180%);
+  --blur-lg:  blur(40px) saturate(200%);
 }
-html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
-  font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden}
+
+html,body{
+  width:100%;height:100%;
+  background:var(--bg-solid);
+  /* Layered ambient spheres for depth */
+  background: radial-gradient(ellipse 80% 60% at 20% 10%, rgba(180,210,255,0.55) 0%, transparent 60%),
+              radial-gradient(ellipse 60% 50% at 80% 90%, rgba(200,185,255,0.40) 0%, transparent 55%),
+              radial-gradient(ellipse 70% 70% at 50% 50%, rgba(220,235,255,0.30) 0%, transparent 70%),
+              linear-gradient(160deg, #dce6f2 0%, #e6e8f5 50%, #dde4f0 100%);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",
+    "Helvetica Neue",system-ui,sans-serif;
+  overflow:hidden;font-size:15px;line-height:1.4;
+}
 a{color:var(--blue);text-decoration:none}
+
+/* ── Screens ── */
 .screen{display:none;width:100%;height:100vh;flex-direction:column}
 .screen.active{display:flex}
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;
-  align-items:center;justify-content:center}
-.modal-bg.active{display:flex}
-.modal{background:var(--bg);border:1px solid var(--border);border-radius:16px;
-  max-width:900px;width:95%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
-/* Buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;border:none;
-  border-radius:10px;cursor:pointer;font-family:inherit;font-weight:600;
-  transition:background .15s,transform .1s;padding:0 16px}
-.btn:active{transform:scale(.97)}
-.btn-green{background:#005522;color:#fff;font-size:16px;height:52px}
-.btn-green:hover{background:#007733}
-.btn-red{background:#660000;color:#fff;font-size:16px;height:52px}
-.btn-red:hover{background:#880011}
-.btn-orange{background:#664400;color:#fff;font-size:16px;height:52px}
-.btn-orange:hover{background:#885500}
-.btn-blue{background:#003366;color:#8cf;font-size:14px;height:40px}
-.btn-blue:hover{background:#004488}
-.btn-ghost{background:transparent;color:var(--muted);font-size:13px;height:36px}
-.btn-ghost:hover{background:#1a1a33}
-.btn-sm{height:32px;font-size:13px;border-radius:8px;padding:0 12px}
-.btn-icon{width:40px;height:36px;font-size:18px;background:transparent;color:#667788;
-  border:none;border-radius:8px;cursor:pointer}
-.btn-icon:hover{background:#1a1a33}
-/* Cards */
-.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px}
-/* Form elements */
-select,input[type=text],input[type=number]{background:#0e0e1e;color:var(--text);
-  border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:inherit;
-  font-size:14px;outline:none;width:100%}
-select:focus,input:focus{border-color:var(--blue)}
-input[type=checkbox]{accent-color:var(--blue);width:18px;height:18px;margin-right:8px}
-label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
-.radio-group{display:flex;gap:8px;flex-wrap:wrap}
-.radio-opt{flex:1;min-width:120px}
-.radio-opt input{display:none}
-.radio-opt span{display:block;text-align:center;padding:12px 8px;border-radius:10px;
-  border:2px solid var(--border);cursor:pointer;transition:all .15s;font-weight:600}
-.radio-opt input:checked+span{border-color:var(--green);background:#0a2218;color:var(--green)}
-.radio-opt:hover span{border-color:#334455}
-.radio-desc{font-size:11px;color:var(--muted);text-align:center;margin-top:4px;font-weight:400}
-/* Scrollbar */
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:#2a2a44;border-radius:3px}
 
-/* ── HOME SCREEN ── */
-#screen-home{align-items:center;justify-content:center}
-.home-card{text-align:center;padding:40px;max-width:500px}
-.home-logo{font-size:42px;font-weight:700;letter-spacing:6px;color:var(--logo);margin-bottom:4px}
-.home-sub{font-size:13px;color:var(--muted);margin-bottom:32px}
-.home-prev{background:var(--card);border:1px solid var(--border);border-radius:14px;
-  padding:18px;margin-bottom:20px;text-align:left}
-.home-prev p{font-size:13px;color:var(--muted);margin-bottom:10px}
-.home-url{font-size:12px;color:var(--muted);margin-top:24px}
+/* ══════════════════════════════
+   LIQUID GLASS MODAL BACKDROP
+   ══════════════════════════════ */
+.modal-bg{
+  display:none;position:fixed;inset:0;
+  background:rgba(180,190,215,0.35);
+  backdrop-filter:var(--blur-lg);
+  -webkit-backdrop-filter:var(--blur-lg);
+  z-index:100;align-items:center;justify-content:center;
+  animation:fade-in .22s ease}
+.modal-bg.active{display:flex}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+
+.modal{
+  background:var(--glass-modal);
+  backdrop-filter:var(--blur-lg);
+  -webkit-backdrop-filter:var(--blur-lg);
+  border-radius:var(--r-2xl);
+  border:1px solid rgba(255,255,255,0.70);
+  max-width:900px;width:95%;max-height:90vh;
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow: var(--shadow-lg),
+              inset 0 1.5px 0 rgba(255,255,255,0.88),
+              inset 0 -1px 0 rgba(0,0,0,0.05);
+  animation:modal-up .26s cubic-bezier(.30,1.12,.45,1)}
+@keyframes modal-up{
+  from{opacity:0;transform:translateY(18px) scale(.96)}
+  to{opacity:1;transform:none}}
+
+/* ══════════════════════════════
+   BUTTONS – Liquid Glass Style
+   ══════════════════════════════ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  border:none;border-radius:var(--r-md);cursor:pointer;
+  font-family:inherit;font-weight:600;font-size:15px;
+  transition:all .18s cubic-bezier(.34,1.20,.64,1);
+  padding:0 22px;letter-spacing:-.2px;white-space:nowrap;
+  position:relative;overflow:hidden}
+.btn::after{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,0.22) 0%,rgba(255,255,255,0) 60%);
+  pointer-events:none}
+.btn:active{transform:scale(.96);opacity:.88}
+
+/* Primary colored buttons */
+.btn-blue{
+  background:linear-gradient(180deg,#2E8FFF 0%,#0065F0 100%);
+  color:#fff;height:50px;
+  border:1px solid rgba(0,80,200,0.30);
+  box-shadow:0 2px 12px rgba(0,100,240,0.35),var(--specular)}
+.btn-green{
+  background:linear-gradient(180deg,#42D966 0%,#28B548 100%);
+  color:#fff;height:50px;
+  border:1px solid rgba(0,140,60,0.25);
+  box-shadow:0 2px 12px rgba(40,180,80,0.32),var(--specular)}
+.btn-red{
+  background:linear-gradient(180deg,#FF5550 0%,#E8281E 100%);
+  color:#fff;height:50px;
+  border:1px solid rgba(200,20,10,0.25);
+  box-shadow:0 2px 12px rgba(240,50,40,0.32),var(--specular)}
+.btn-orange{
+  background:linear-gradient(180deg,#FFAA20 0%,#F08000 100%);
+  color:#fff;height:50px;
+  border:1px solid rgba(180,90,0,0.20);
+  box-shadow:0 2px 12px rgba(240,140,0,0.30),var(--specular)}
+
+.btn-blue:hover  {box-shadow:0 4px 20px rgba(0,100,240,0.45),var(--specular);filter:brightness(1.06)}
+.btn-green:hover {box-shadow:0 4px 20px rgba(40,180,80,0.42),var(--specular);filter:brightness(1.06)}
+.btn-red:hover   {box-shadow:0 4px 20px rgba(240,50,40,0.42),var(--specular);filter:brightness(1.06)}
+.btn-orange:hover{box-shadow:0 4px 20px rgba(240,140,0,0.40),var(--specular);filter:brightness(1.06)}
+
+/* Secondary ghost */
+.btn-ghost{
+  background:var(--glass-btn);
+  backdrop-filter:var(--blur-sm);
+  -webkit-backdrop-filter:var(--blur-sm);
+  color:var(--blue);
+  height:44px;font-weight:500;border-radius:var(--r-md);
+  border:1px solid rgba(255,255,255,0.65);
+  box-shadow:var(--shadow-sm),var(--specular)}
+.btn-ghost:hover{background:rgba(255,255,255,0.68);box-shadow:var(--shadow-md),var(--specular)}
+
+/* Sizes */
+.btn-sm{height:34px;font-size:13px;border-radius:10px;padding:0 14px}
+
+/* Icon buttons */
+.btn-icon{
+  width:36px;height:36px;font-size:16px;
+  background:var(--glass-thin);
+  backdrop-filter:var(--blur-sm);
+  -webkit-backdrop-filter:var(--blur-sm);
+  color:var(--blue);
+  border:1px solid rgba(255,255,255,0.55);
+  border-radius:10px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:all .18s;flex-shrink:0;
+  box-shadow:var(--shadow-sm),var(--specular)}
+.btn-icon:hover{
+  background:rgba(255,255,255,0.55);
+  box-shadow:var(--shadow-md),var(--specular);
+  transform:translateY(-1px)}
+.btn-icon.destructive{color:var(--red)}
+.btn-icon.destructive:hover{background:rgba(255,59,48,.12)}
+
+/* ══════════════════════════════
+   GLASS CARD
+   ══════════════════════════════ */
+.card{
+  background:var(--glass-card);
+  backdrop-filter:var(--blur-md);
+  -webkit-backdrop-filter:var(--blur-md);
+  border-radius:var(--r-md);
+  border:1px solid rgba(255,255,255,0.68);
+  padding:12px 14px;
+  box-shadow:var(--shadow-sm),var(--specular)}
+
+/* ══════════════════════════════
+   FORM ELEMENTS
+   ══════════════════════════════ */
+select,input[type=text],input[type=number]{
+  background:rgba(255,255,255,0.55);
+  backdrop-filter:var(--blur-sm);
+  -webkit-backdrop-filter:var(--blur-sm);
+  color:var(--text);
+  border:1px solid rgba(255,255,255,0.72);
+  border-radius:var(--r-sm);
+  padding:10px 14px;font-family:inherit;font-size:15px;
+  outline:none;width:100%;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+  box-shadow:var(--shadow-sm),var(--specular)}
+select:focus,input:focus{
+  border-color:rgba(0,120,255,0.55);
+  background:rgba(255,255,255,0.75);
+  box-shadow:0 0 0 4px rgba(0,122,255,.18),var(--shadow-sm),var(--specular)}
+
+input[type=checkbox]{
+  accent-color:var(--blue);width:20px;height:20px;
+  margin-right:6px;cursor:pointer}
+label{
+  display:flex;align-items:center;gap:8px;cursor:pointer;
+  font-size:15px;color:var(--text)}
+
+/* Radio pills */
+.radio-group{display:flex;gap:8px;flex-wrap:wrap}
+.radio-opt{flex:1;min-width:110px}
+.radio-opt input{display:none}
+.radio-opt span{
+  display:block;text-align:center;
+  padding:12px 8px;border-radius:var(--r-md);
+  border:1px solid rgba(255,255,255,0.60);
+  background:rgba(255,255,255,0.40);
+  backdrop-filter:var(--blur-sm);
+  -webkit-backdrop-filter:var(--blur-sm);
+  cursor:pointer;transition:all .20s;
+  font-weight:600;font-size:14px;color:var(--muted);
+  box-shadow:var(--shadow-sm),var(--specular)}
+.radio-opt input:checked+span{
+  border-color:rgba(0,118,255,0.50);
+  background:rgba(0,100,255,0.12);
+  color:var(--blue);
+  box-shadow:0 0 0 3px rgba(0,122,255,.14),var(--shadow-sm),var(--specular)}
+.radio-opt:hover span{
+  border-color:rgba(255,255,255,0.80);
+  background:rgba(255,255,255,0.60);
+  color:var(--text)}
+.radio-desc{font-size:11px;color:var(--muted);text-align:center;margin-top:3px;font-weight:400}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(120,130,160,0.20);border-radius:2px}
+
+/* ══════════════════════════════
+   HOME SCREEN
+   ══════════════════════════════ */
+#screen-home{
+  align-items:center;justify-content:center}
+
+.home-card{
+  text-align:center;padding:56px 40px;
+  max-width:440px;width:100%;
+  background:var(--glass-card);
+  backdrop-filter:var(--blur-lg);
+  -webkit-backdrop-filter:var(--blur-lg);
+  border-radius:var(--r-2xl);
+  border:1px solid rgba(255,255,255,0.72);
+  box-shadow:var(--shadow-lg),
+             inset 0 1.5px 0 rgba(255,255,255,0.90),
+             inset 0 -1px 0 rgba(0,0,0,0.04)}
+
+.home-logo{
+  font-size:32px;font-weight:700;
+  letter-spacing:10px;color:var(--text);
+  margin-bottom:8px}
+
+.home-sub{
+  font-size:13px;color:var(--muted);
+  margin-bottom:48px;letter-spacing:.2px}
+
+.home-prev{
+  background:rgba(255,255,255,0.38);
+  backdrop-filter:var(--blur-sm);
+  -webkit-backdrop-filter:var(--blur-sm);
+  border-radius:var(--r-lg);
+  border:1px solid rgba(255,255,255,0.60);
+  padding:20px;margin-bottom:16px;
+  text-align:left;
+  box-shadow:var(--shadow-sm),var(--specular)}
+
+.home-prev p{
+  font-size:11px;color:var(--muted);margin-bottom:10px;
+  font-weight:600;text-transform:uppercase;letter-spacing:.8px}
+
+.home-url{
+  font-size:13px;color:var(--muted);margin-top:32px}
 .home-url code{color:var(--blue);font-size:13px}
 
-/* ── SETUP SCREEN ── */
-#screen-setup{align-items:center;overflow-y:auto}
-.setup-wrap{max-width:560px;width:100%;padding:30px 20px}
-.setup-title{font-size:24px;font-weight:700;color:var(--blue);margin-bottom:4px}
-.setup-subtitle{font-size:13px;color:var(--muted);margin-bottom:24px}
-.form-section{margin-bottom:20px}
-.form-section h3{font-size:11px;font-weight:700;color:#556688;text-transform:uppercase;
-  letter-spacing:1px;margin-bottom:8px}
+/* ══════════════════════════════
+   SETUP SCREEN
+   ══════════════════════════════ */
+#screen-setup{
+  align-items:center;overflow-y:auto}
+
+.setup-wrap{max-width:560px;width:100%;padding:40px 24px 48px}
+
+.setup-title{
+  font-size:28px;font-weight:700;color:var(--text);
+  margin-bottom:4px;letter-spacing:-.6px}
+.setup-subtitle{font-size:15px;color:var(--muted);margin-bottom:32px}
+
+.form-section{
+  background:var(--glass-card);
+  backdrop-filter:var(--blur-md);
+  -webkit-backdrop-filter:var(--blur-md);
+  border-radius:var(--r-lg);
+  border:1px solid rgba(255,255,255,0.68);
+  padding:16px 18px;
+  margin-bottom:14px;
+  box-shadow:var(--shadow-sm),var(--specular-strong)}
+
+.form-section h3{
+  font-size:11px;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
+
 .form-row{display:flex;gap:10px;margin-bottom:8px}
 .form-row>*{flex:1}
-.form-err{color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px}
-.gps-grid{display:grid;grid-template-columns:80px 1fr 1fr;gap:6px;align-items:center}
-.gps-grid span{font-size:13px;color:var(--muted)}
-.zone-status{font-size:13px;margin-top:6px}
+.form-err{color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px;font-weight:500}
 
-/* ── MAIN SCREEN ── */
-.main-top{height:56px;background:var(--panel);display:flex;align-items:center;
-  padding:0 16px;flex-shrink:0;border-bottom:1px solid var(--border)}
-.main-top .logo{font-size:17px;font-weight:300;color:var(--logo);letter-spacing:2px}
-.badge{padding:4px 14px;border-radius:10px;font-size:13px;font-weight:700;margin-left:12px}
-.badge-normal{background:#0a2218;color:var(--green)}
-.badge-alarm{background:#550000;color:#fff}
-.badge-rescue{background:#553300;color:#fff}
-.main-top .clock{margin-left:auto;color:#556677;font-size:13px;margin-right:8px}
+.gps-grid{display:grid;grid-template-columns:84px 1fr 1fr;gap:8px;align-items:center}
+.gps-grid span{font-size:13px;color:var(--muted);font-weight:500}
+.zone-status{font-size:13px;margin-top:8px;font-weight:500}
+
+/* ══════════════════════════════
+   MAIN – TOP BAR  (liquid glass bar)
+   ══════════════════════════════ */
+.main-top{
+  height:52px;
+  background:var(--glass-topbar);
+  backdrop-filter:var(--blur-lg);
+  -webkit-backdrop-filter:var(--blur-lg);
+  display:flex;align-items:center;
+  padding:0 16px;flex-shrink:0;
+  border-bottom:1px solid rgba(255,255,255,0.50);
+  box-shadow:0 1px 0 rgba(255,255,255,0.75) inset,
+             0 4px 16px rgba(40,50,80,0.08);
+  gap:4px}
+
+.main-top .logo{
+  font-size:14px;font-weight:700;color:var(--text);
+  letter-spacing:3px;margin-right:4px}
+
+.badge{
+  padding:4px 11px;border-radius:20px;
+  font-size:11px;font-weight:700;
+  margin-left:8px;letter-spacing:.2px;
+  border:1px solid transparent}
+.badge-normal{
+  background:rgba(48,199,84,0.15);
+  border-color:rgba(48,199,84,0.30);
+  color:#1a8a3a}
+.badge-alarm{
+  background:rgba(255,55,48,0.13);
+  border-color:rgba(255,55,48,0.28);
+  color:var(--red)}
+.badge-rescue{
+  background:rgba(255,150,0,0.13);
+  border-color:rgba(255,150,0,0.28);
+  color:#b06000}
+
+.main-top .clock{
+  margin-left:auto;color:var(--muted);
+  font-size:13px;margin-right:8px}
+
+/* ── Main Body ── */
 .main-body{display:flex;flex:1;overflow:hidden}
-.video-area{flex:1;position:relative;background:#030310;overflow:hidden;cursor:default}
+
+/* ══════════════════════════════
+   VIDEO AREA
+   ══════════════════════════════ */
+.video-area{
+  flex:1;position:relative;background:#06080c;
+  overflow:hidden;cursor:default}
 .video-area.zoomed{cursor:grab}
 .video-area.zoomed.panning{cursor:grabbing}
-#zoom-wrap{position:absolute;inset:0;display:flex;align-items:center;
+
+#zoom-wrap{
+  position:absolute;inset:0;display:flex;align-items:center;
   justify-content:center;transform-origin:50% 50%;will-change:transform}
 #zoom-wrap img{width:100%;height:100%;object-fit:contain;pointer-events:none}
-.zoom-indicator{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
-  background:rgba(0,0,0,0.65);color:#0af;font-size:12px;font-weight:700;
-  padding:3px 10px;border-radius:12px;z-index:40;pointer-events:none;
-  transition:opacity .4s;opacity:0}
-.zoom-indicator.visible{opacity:1}
-.video-placeholder{position:absolute;color:#252540;font-size:20px}
-.banner{position:absolute;top:0;left:0;right:0;height:56px;display:none;
-  align-items:center;justify-content:center;font-size:17px;font-weight:700;z-index:10}
-.banner.alarm{display:flex;background:#2a0000;color:#ff3333}
-.banner.rescue{display:flex;background:#1e1000;color:var(--orange)}
-/* Sensitivity popup */
-.sens-popup{position:absolute;background:#0d0d22;border:2px solid var(--blue);
-  border-radius:10px;padding:6px;z-index:30;min-width:180px;display:flex;
-  flex-direction:column;gap:2px;pointer-events:auto}
-.sens-popup .title{font-size:12px;font-weight:700;color:var(--text);text-align:center;
-  padding:2px 0}
-.sens-popup .current{font-size:10px;color:var(--muted);text-align:center;margin-bottom:4px}
-.sens-popup button{height:28px;border:none;border-radius:6px;cursor:pointer;font-size:12px;
-  font-weight:600;color:#fff;width:100%;margin:1px 0}
-/* Side panel */
-.side{width:240px;background:var(--panel);border-left:1px solid var(--border);
-  overflow-y:auto;flex-shrink:0;padding:14px 12px}
-.status-box{border-radius:14px;padding:12px;text-align:center;margin-bottom:10px;
-  border:1px solid}
-.status-box.normal{background:#0a2218;border-color:#1a3a2a}
-.status-box.alarm{background:#2a0008;border-color:#550011}
-.status-box.rescue{background:#1e1200;border-color:#443300}
-.status-lbl{font-size:18px;font-weight:700}
-.side-card{margin-bottom:8px}
-.side-card .label{font-size:10px;font-weight:700;color:#556688;text-transform:uppercase;
-  margin-bottom:4px}
-.side-big{font-size:42px;font-weight:700;text-align:center;padding:4px 0}
-.side-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
-.side-row .k{color:#667788}
-.side-row .v{font-weight:700}
-.side-sep{height:1px;background:var(--border);margin:8px 0}
-.side-section{font-size:10px;font-weight:700;color:#556688;margin:6px 0 4px}
-#drone-stop{width:100%;height:36px;background:#440000;color:#ff8888;border:none;
-  border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;margin-top:4px}
-#drone-stop:hover{background:#660000}
-#aruco-reset{width:100%;height:28px;background:#1a1a35;color:#6677aa;border:none;
-  border-radius:8px;cursor:pointer;font-size:11px;margin-top:4px}
-#aruco-reset:hover{background:#252555}
-.tg-status{font-size:11px;color:#3a6644;margin-top:10px}
-/* Drowning persons list in side panel */
-.drown-list{display:flex;flex-direction:column;gap:6px}
-.drown-entry{background:#1a0008;border:2px solid #550011;border-radius:10px;padding:8px;
-  display:flex;flex-direction:column;gap:4px;cursor:default;transition:border-color .2s}
-.drown-entry:hover{border-color:#ff4455}
-.drown-entry.locked{background:#1e1200;border-color:#443300}
-.drown-entry.locked:hover{border-color:var(--orange)}
-.drown-entry .de-head{display:flex;align-items:center;justify-content:space-between}
-.drown-entry .de-name{font-size:12px;font-weight:700;color:#ff6666}
-.drown-entry.locked .de-name{color:var(--orange)}
-.drown-entry .de-status{font-size:10px;color:#888}
-.drown-entry .de-actions{display:flex;gap:4px}
-.drown-entry .de-actions button{flex:1;height:28px;border:none;border-radius:6px;
-  cursor:pointer;font-size:12px;font-weight:600;color:#fff}
-.drown-entry .de-actions .de-yes{background:#005522}
-.drown-entry .de-actions .de-yes:hover{background:#007733}
-.drown-entry .de-actions .de-no{background:#660000}
-.drown-entry .de-actions .de-no:hover{background:#880011}
-/* Highlight ring on video for hovered person */
-.person-highlight{position:absolute;width:80px;height:80px;border:3px solid #ff4455;
-  border-radius:50%;pointer-events:none;z-index:20;transform:translate(-50%,-50%);
-  box-shadow:0 0 20px rgba(255,50,70,0.6);animation:pulse-ring 1s infinite}
-.person-highlight.locked{border-color:var(--orange);box-shadow:0 0 20px rgba(255,136,0,0.6)}
-@keyframes pulse-ring{0%,100%{opacity:1;transform:translate(-50%,-50%) scale(1)}50%{opacity:.6;transform:translate(-50%,-50%) scale(1.15)}}
-/* Ghost marker: last known position when person leaves frame */
-.ghost-marker{position:absolute;width:70px;height:70px;border:2px dashed #ff4455;
-  border-radius:50%;pointer-events:none;z-index:18;transform:translate(-50%,-50%);
-  animation:ghost-pulse 1.5s infinite;background:rgba(255,0,30,0.06)}
-.ghost-marker .ghost-lbl{position:absolute;top:-22px;left:50%;transform:translateX(-50%);
-  font-size:11px;font-weight:700;color:#ff4455;white-space:nowrap;
-  text-shadow:0 0 4px #000;background:rgba(0,0,0,0.6);padding:1px 5px;border-radius:4px}
-.ghost-marker .ghost-sub{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
-  font-size:9px;color:#ff8888;white-space:nowrap;text-shadow:0 0 4px #000}
-@keyframes ghost-pulse{0%,100%{opacity:.8}50%{opacity:.35}}
-/* GPS clipboard toast */
-.gps-toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);
-  background:rgba(0,136,255,0.92);color:#fff;font-size:12px;font-weight:700;
-  padding:5px 14px;border-radius:12px;z-index:999;pointer-events:none;
-  opacity:0;transition:opacity .3s}
-.gps-toast.show{opacity:1}
-/* Bottom bar */
-.main-bot{height:90px;background:var(--panel);border-top:1px solid var(--border);
-  display:flex;align-items:center;justify-content:center;padding:0 20px;flex-shrink:0;
-  gap:12px;position:relative}
-.bot-msg{font-size:16px;position:absolute}
-.bot-actions{display:flex;gap:12px;width:100%;justify-content:center}
-.bot-actions .btn{flex:1;max-width:500px}
 
-/* ── MODAL CONTENT ── */
-.modal-header{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)}
-.modal-header h2{font-size:20px;font-weight:700;color:var(--blue)}
-.modal-header .close{margin-left:auto;font-size:22px;cursor:pointer;color:var(--muted);
-  background:none;border:none;padding:4px 10px;border-radius:6px}
-.modal-header .close:hover{background:#1a1a33;color:var(--text)}
-.modal-body{flex:1;overflow-y:auto;padding:16px 18px}
-.modal-footer{display:flex;align-items:center;padding:10px 18px;gap:10px;
-  border-top:1px solid var(--border)}
-/* Log table */
+.zoom-indicator{
+  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,0.55);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  color:#fff;font-size:12px;font-weight:600;
+  padding:5px 14px;border-radius:20px;z-index:40;pointer-events:none;
+  transition:opacity .3s;opacity:0;
+  border:1px solid rgba(255,255,255,0.15)}
+.zoom-indicator.visible{opacity:1}
+
+.video-placeholder{
+  position:absolute;color:rgba(255,255,255,.22);
+  font-size:15px;font-weight:500;letter-spacing:.2px}
+
+/* Alert Banner */
+.banner{
+  position:absolute;top:0;left:0;right:0;height:48px;
+  display:none;align-items:center;justify-content:center;
+  font-size:14px;font-weight:700;z-index:10;letter-spacing:-.2px;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px)}
+.banner.alarm{
+  display:flex;
+  background:rgba(255,55,48,0.82);
+  border-bottom:1px solid rgba(255,120,110,0.50);
+  color:#fff}
+.banner.rescue{
+  display:flex;
+  background:rgba(255,150,0,0.80);
+  border-bottom:1px solid rgba(255,200,80,0.40);
+  color:#fff}
+
+/* ══════════════════════════════
+   SENSITIVITY POPUP  (glass)
+   ══════════════════════════════ */
+.sens-popup{
+  position:absolute;
+  background:rgba(248,250,255,0.80);
+  backdrop-filter:var(--blur-lg);
+  -webkit-backdrop-filter:var(--blur-lg);
+  border-radius:var(--r-lg);
+  border:1px solid rgba(255,255,255,0.75);
+  padding:8px;z-index:30;min-width:200px;
+  display:flex;flex-direction:column;gap:4px;
+  pointer-events:auto;
+  box-shadow:var(--shadow-lg),
+             inset 0 1px 0 rgba(255,255,255,0.90)}
+.sens-popup .title{
+  font-size:13px;font-weight:700;color:var(--text);
+  text-align:center;padding:6px 0 2px}
+.sens-popup .current{
+  font-size:11px;color:var(--muted);text-align:center;margin-bottom:4px}
+.sens-popup button{
+  height:38px;border:none;border-radius:10px;
+  cursor:pointer;font-size:13px;font-weight:600;width:100%;
+  margin:1px 0;transition:all .16s;color:#fff;position:relative;overflow:hidden}
+.sens-popup button::after{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,0.18) 0%,transparent 60%);
+  pointer-events:none}
+.sens-popup button:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.sens-popup button:active{opacity:.8;transform:scale(.97)}
+
+/* ══════════════════════════════
+   SIDE PANEL  (frosted glass)
+   ══════════════════════════════ */
+.side{
+  width:252px;
+  background:var(--glass-sidebar);
+  backdrop-filter:var(--blur-md);
+  -webkit-backdrop-filter:var(--blur-md);
+  border-left:1px solid rgba(255,255,255,0.52);
+  box-shadow:inset 1px 0 0 rgba(255,255,255,0.38);
+  overflow-y:auto;flex-shrink:0;
+  padding:12px 10px}
+
+.status-box{
+  border-radius:var(--r-md);padding:12px;
+  text-align:center;margin-bottom:10px;
+  border:1px solid transparent}
+.status-box.normal{
+  background:rgba(48,199,84,0.12);
+  border-color:rgba(48,199,84,0.25)}
+.status-box.alarm{
+  background:rgba(255,55,48,0.10);
+  border-color:rgba(255,55,48,0.22)}
+.status-box.rescue{
+  background:rgba(255,150,0,0.10);
+  border-color:rgba(255,150,0,0.22)}
+
+.status-lbl{font-size:16px;font-weight:700}
+.status-lbl.normal{color:#1a8a3a}
+.status-lbl.alarm{color:var(--red)}
+.status-lbl.rescue{color:#b06000}
+
+.side-card{
+  background:var(--glass-card);
+  backdrop-filter:var(--blur-md);
+  -webkit-backdrop-filter:var(--blur-md);
+  border-radius:var(--r-md);
+  border:1px solid rgba(255,255,255,0.68);
+  padding:10px 12px;margin-bottom:8px;
+  box-shadow:var(--shadow-sm),var(--specular)}
+.side-card .label{
+  font-size:10px;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+
+.side-big{
+  font-size:44px;font-weight:700;text-align:center;
+  padding:2px 0;letter-spacing:-2px;color:var(--text)}
+
+.side-row{
+  display:flex;justify-content:space-between;
+  padding:6px 0;font-size:13px;
+  border-bottom:1px solid var(--sep)}
+.side-row:last-child{border-bottom:none}
+.side-row .k{color:var(--muted)}
+.side-row .v{font-weight:600;color:var(--text)}
+
+.side-sep{height:1px;background:var(--sep);margin:10px 0}
+
+.side-section{
+  font-size:11px;font-weight:600;color:var(--muted);
+  margin:10px 0 6px 2px;
+  text-transform:uppercase;letter-spacing:.8px}
+
+#drone-stop{
+  width:100%;height:40px;
+  background:rgba(255,55,48,0.10);
+  backdrop-filter:var(--blur-sm);
+  -webkit-backdrop-filter:var(--blur-sm);
+  color:var(--red);
+  border:1px solid rgba(255,55,48,0.22);
+  border-radius:var(--r-md);
+  cursor:pointer;font-size:13px;font-weight:600;
+  margin-top:4px;transition:all .2s;font-family:inherit;
+  box-shadow:var(--specular)}
+#drone-stop:hover{
+  background:rgba(255,55,48,0.18);
+  box-shadow:0 4px 16px rgba(255,55,48,0.18),var(--specular)}
+
+#aruco-reset{
+  width:100%;height:30px;
+  background:rgba(255,255,255,0.28);
+  backdrop-filter:var(--blur-sm);
+  -webkit-backdrop-filter:var(--blur-sm);
+  color:var(--muted);
+  border:1px solid rgba(255,255,255,0.48);
+  border-radius:var(--r-sm);
+  cursor:pointer;font-size:11px;margin-top:6px;
+  font-family:inherit;font-weight:500;transition:all .2s;
+  box-shadow:var(--specular)}
+#aruco-reset:hover{background:rgba(255,255,255,0.45)}
+
+.tg-status{font-size:11px;color:var(--green);margin-top:10px;font-weight:500}
+
+/* ══════════════════════════════
+   DROWNING PERSONS LIST
+   ══════════════════════════════ */
+.drown-list{display:flex;flex-direction:column;gap:6px}
+
+.drown-entry{
+  background:rgba(255,255,255,0.50);
+  backdrop-filter:var(--blur-sm);
+  -webkit-backdrop-filter:var(--blur-sm);
+  border:1.5px solid rgba(255,55,48,0.30);
+  border-radius:var(--r-md);padding:10px;
+  display:flex;flex-direction:column;gap:4px;
+  cursor:default;transition:all .2s;
+  box-shadow:var(--shadow-sm),var(--specular)}
+.drown-entry:hover{
+  border-color:rgba(255,55,48,0.65);
+  box-shadow:0 6px 20px rgba(255,55,48,0.14),var(--specular);
+  transform:translateY(-1px)}
+.drown-entry.locked{border-color:rgba(255,150,0,0.38)}
+.drown-entry.locked:hover{
+  border-color:rgba(255,150,0,0.72);
+  box-shadow:0 6px 20px rgba(255,150,0,0.14),var(--specular);
+  transform:translateY(-1px)}
+
+.drown-entry .de-head{display:flex;align-items:center;justify-content:space-between}
+.drown-entry .de-name{font-size:12px;font-weight:700;color:var(--red)}
+.drown-entry.locked .de-name{color:var(--orange)}
+.drown-entry .de-status{font-size:10px;color:var(--muted)}
+.drown-entry .de-actions{display:flex;gap:4px;margin-top:2px}
+.drown-entry .de-actions button{
+  flex:1;height:30px;border:none;border-radius:var(--r-sm);
+  cursor:pointer;font-size:12px;font-weight:600;
+  transition:all .16s;font-family:inherit;position:relative;overflow:hidden}
+.drown-entry .de-actions button::after{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,0.20) 0%,transparent 60%);
+  pointer-events:none}
+.drown-entry .de-actions button:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.drown-entry .de-actions .de-yes{
+  background:linear-gradient(180deg,#3EA3FF,#0065F0);color:#fff}
+.drown-entry .de-actions .de-no{
+  background:linear-gradient(180deg,#FF5550,#E0201A);color:#fff}
+
+/* ══════════════════════════════
+   OVERLAYS (Video)
+   ══════════════════════════════ */
+.person-highlight{
+  position:absolute;width:80px;height:80px;
+  border:2.5px solid var(--red);border-radius:50%;
+  pointer-events:none;z-index:20;transform:translate(-50%,-50%);
+  box-shadow:0 0 0 4px rgba(255,55,48,.22),
+             0 0 20px rgba(255,55,48,.30);
+  animation:pulse-ring 1s ease-in-out infinite}
+.person-highlight.locked{
+  border-color:var(--orange);
+  box-shadow:0 0 0 4px rgba(255,150,0,.22),
+             0 0 20px rgba(255,150,0,.30)}
+@keyframes pulse-ring{
+  0%,100%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  50%{opacity:.55;transform:translate(-50%,-50%) scale(1.14)}}
+
+.ghost-marker{
+  position:absolute;width:70px;height:70px;
+  border:2px dashed var(--red);border-radius:50%;
+  pointer-events:none;z-index:18;transform:translate(-50%,-50%);
+  animation:ghost-pulse 1.5s ease-in-out infinite;
+  background:rgba(255,55,48,.06)}
+.ghost-marker .ghost-lbl{
+  position:absolute;top:-24px;left:50%;transform:translateX(-50%);
+  font-size:11px;font-weight:700;color:#fff;white-space:nowrap;
+  background:rgba(255,55,48,.88);padding:2px 8px;border-radius:6px}
+.ghost-marker .ghost-sub{
+  position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
+  font-size:9px;color:rgba(255,255,255,.65);white-space:nowrap}
+@keyframes ghost-pulse{0%,100%{opacity:.80}50%{opacity:.22}}
+
+/* ══════════════════════════════
+   GPS TOAST  (glass pill)
+   ══════════════════════════════ */
+.gps-toast{
+  position:fixed;bottom:108px;left:50%;transform:translateX(-50%);
+  background:rgba(18,20,28,0.72);
+  backdrop-filter:blur(16px) saturate(180%);
+  -webkit-backdrop-filter:blur(16px) saturate(180%);
+  border:1px solid rgba(255,255,255,0.14);
+  color:#fff;font-size:13px;font-weight:500;
+  padding:8px 18px;border-radius:22px;
+  z-index:999;pointer-events:none;opacity:0;
+  transition:opacity .25s;
+  box-shadow:0 4px 20px rgba(0,0,0,0.25)}
+.gps-toast.show{opacity:1}
+
+/* ══════════════════════════════
+   BOTTOM BAR  (glass shelf)
+   ══════════════════════════════ */
+.main-bot{
+  height:84px;
+  background:rgba(255,255,255,0.62);
+  backdrop-filter:var(--blur-lg);
+  -webkit-backdrop-filter:var(--blur-lg);
+  border-top:1px solid rgba(255,255,255,0.72);
+  box-shadow:0 -1px 0 rgba(255,255,255,0.80) inset,
+             0 -6px 20px rgba(40,50,80,0.06);
+  display:flex;align-items:center;justify-content:center;
+  padding:0 24px;flex-shrink:0;gap:12px;position:relative}
+.bot-msg{font-size:15px;position:absolute;color:var(--text);font-weight:500}
+.bot-actions{display:flex;gap:12px;width:100%;justify-content:center}
+.bot-actions .btn{flex:1;max-width:480px}
+
+/* ══════════════════════════════
+   MODAL HEADER / BODY / FOOTER
+   ══════════════════════════════ */
+.modal-header{
+  display:flex;align-items:center;
+  padding:18px 22px 16px;
+  border-bottom:1px solid rgba(180,190,220,0.22)}
+.modal-header h2{
+  font-size:17px;font-weight:700;
+  color:var(--text);letter-spacing:-.3px}
+.modal-header .close{
+  margin-left:auto;cursor:pointer;
+  background:rgba(120,130,160,0.14);
+  border:none;width:28px;height:28px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:13px;color:var(--muted);font-weight:700;
+  transition:background .15s}
+.modal-header .close:hover{background:rgba(120,130,160,0.26)}
+
+.modal-body{flex:1;overflow-y:auto;padding:16px 22px}
+.modal-footer{
+  display:flex;align-items:center;
+  padding:12px 22px;gap:10px;
+  border-top:1px solid rgba(180,190,220,0.22);
+  background:rgba(240,244,252,0.60)}
+
+/* ── Log Table ── */
 .log-table{width:100%;border-collapse:collapse}
-.log-table th{text-align:left;font-size:11px;color:#556688;padding:6px 8px;
-  border-bottom:1px solid var(--border)}
-.log-table td{padding:8px;border-bottom:1px solid #0e0e1e;font-size:13px}
-.log-table tr:hover td{background:#0e0e1e}
-/* KPI boxes */
-.kpi-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-.kpi{flex:1;min-width:100px;background:#0e0e20;border:1px solid var(--border);
-  border-radius:12px;padding:10px;text-align:center}
-.kpi .val{font-size:28px;font-weight:700}
-.kpi .lbl{font-size:11px;color:var(--muted)}
-/* Bar chart */
-.bar-chart{display:flex;align-items:flex-end;gap:4px;height:140px;
-  padding:10px 0;border-bottom:1px solid var(--border)}
-.bar-chart .bar{flex:1;min-width:20px;background:var(--red);border-radius:4px 4px 0 0;
-  position:relative;transition:height .3s}
-.bar-chart .bar span{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);
+.log-table th{
+  text-align:left;font-size:11px;color:var(--muted);
+  padding:8px 10px;border-bottom:1px solid var(--sep);
+  font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.log-table td{
+  padding:10px;font-size:13px;
+  border-bottom:1px solid rgba(100,110,140,.07)}
+.log-table tr:hover td{background:rgba(255,255,255,0.40)}
+
+/* ── KPI Boxes ── */
+.kpi-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.kpi{
+  flex:1;min-width:100px;
+  background:var(--glass-card);
+  backdrop-filter:var(--blur-sm);
+  -webkit-backdrop-filter:var(--blur-sm);
+  border:1px solid rgba(255,255,255,0.65);
+  border-radius:var(--r-md);
+  padding:14px 10px;text-align:center;
+  box-shadow:var(--shadow-sm),var(--specular)}
+.kpi .val{font-size:30px;font-weight:700;letter-spacing:-1px}
+.kpi .lbl{font-size:11px;color:var(--muted);margin-top:2px;font-weight:500}
+
+/* ── Bar Chart ── */
+.bar-chart{
+  display:flex;align-items:flex-end;gap:4px;height:140px;
+  padding:10px 0;border-bottom:1px solid var(--sep)}
+.bar-chart .bar{
+  flex:1;min-width:20px;
+  background:linear-gradient(180deg,rgba(255,80,70,0.80),rgba(220,30,20,0.70));
+  border-radius:5px 5px 0 0;position:relative;transition:height .35s;
+  box-shadow:0 2px 8px rgba(220,30,20,0.20)}
+.bar-chart .bar span{
+  position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);
   font-size:9px;color:var(--muted);white-space:nowrap}
 
-/* Zone editor */
-.zone-editor{position:relative;background:#030310;display:flex;align-items:center;
-  justify-content:center}
-.zone-editor canvas{position:absolute;cursor:crosshair}
-.zone-editor img{max-width:100%;max-height:100%;object-fit:contain}
+/* ── Zone Editor ── */
 .zone-info{font-size:12px;color:var(--muted);padding:8px 0}
 
-/* Blink animation */
+/* ══════════════════════════════
+   ALARM BLINK
+   ══════════════════════════════ */
 @keyframes alarm-blink{
-  0%,100%{background:#1a0005}
-  50%{background:var(--bg)}
-}
-.blink-alarm{animation:alarm-blink .6s infinite}
-.blink-alarm .main-bot{animation:alarm-blink .6s infinite}
+  0%,100%{background:rgba(255,55,48,0.03)}
+  50%{background:transparent}}
+.blink-alarm{animation:alarm-blink .65s ease-in-out infinite}
 
-/* Mobile-drown panel: hidden on desktop, visible on mobile */
+/* ══════════════════════════════
+   MOBILE  (≤768 px)
+   ══════════════════════════════ */
 .mobile-drown{display:none}
-/* Responsive */
 @media(max-width:768px){
   .side{display:none}
-  .main-top .logo{font-size:14px;letter-spacing:1px}
-  /* Mobile: show drowning panel floating above bottom bar */
-  .mobile-drown{display:flex;flex-direction:column;gap:6px;position:absolute;
-    bottom:96px;left:8px;right:8px;z-index:25;max-height:40vh;overflow-y:auto}
-  .mobile-drown .drown-entry{box-shadow:0 4px 16px rgba(0,0,0,.6)}
+  .main-top .logo{font-size:11px;letter-spacing:2px}
+  .mobile-drown{
+    display:flex;flex-direction:column;gap:6px;
+    position:absolute;bottom:92px;left:8px;right:8px;
+    z-index:25;max-height:40vh;overflow-y:auto}
+  .mobile-drown .drown-entry{box-shadow:var(--shadow-md)}
 }
 </style>
 </head>
@@ -266,17 +772,17 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
     <div id="home-prev" class="home-prev" style="display:none">
       <p>Letzte Konfiguration:</p>
       <div id="home-prev-info" style="color:var(--text);font-size:14px;margin-bottom:12px"></div>
-      <button class="btn btn-green" style="width:100%;margin-bottom:8px" onclick="quickStart()">
-        ▶&ensp;STARTEN</button>
+      <button class="btn btn-blue" style="width:100%;margin-bottom:10px" onclick="quickStart()">
+        Starten</button>
       <button class="btn btn-ghost" style="width:100%" onclick="showScreen('setup')">
-        ⚙&ensp;Einstellungen ändern</button>
+        Einstellungen ändern</button>
     </div>
     <div id="home-no-prev">
-      <button class="btn btn-green" style="width:100%;margin-bottom:8px" onclick="showScreen('setup')">
-        ▶&ensp;EINRICHTEN &amp; STARTEN</button>
+      <button class="btn btn-blue" style="width:100%;margin-bottom:10px" onclick="showScreen('setup')">
+        Einrichten &amp; Starten</button>
     </div>
     <div class="home-url">
-      📱 Handy-Remote: <code id="home-url"></code>
+      Remote-Adresse:&ensp;<code id="home-url"></code>
     </div>
   </div>
 </div>
@@ -284,7 +790,7 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
 <!-- ══════════════════════ SETUP SCREEN ══════════════════════ -->
 <div id="screen-setup" class="screen" style="align-items:center;overflow-y:auto">
   <div class="setup-wrap">
-    <div class="setup-title">⚙ Einstellungen</div>
+    <div class="setup-title">Einstellungen</div>
     <div class="setup-subtitle">Konfiguration vor dem Start</div>
 
     <div class="form-section">
@@ -296,8 +802,8 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
 
     <div class="form-section">
       <h3>Überwachungsbereich</h3>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">
-        Markiere Bereiche die NICHT zum Wasser gehören (z.B. Liegewiese, Gebäude).</p>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px">
+        Markiere Bereiche, die nicht zum Wasser gehören (z.B. Liegewiese, Gebäude).</p>
       <button class="btn btn-blue btn-sm" onclick="openZoneEditor()">
         📷&ensp;Kameravorschau öffnen</button>
       <div id="zone-status" class="zone-status" style="color:var(--muted)">
@@ -346,10 +852,10 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
     </div>
 
     <div id="setup-err" class="form-err"></div>
-    <button class="btn btn-green" style="width:100%;height:60px;font-size:18px" onclick="startSystem()">
-      ▶&ensp;SPEICHERN &amp; STARTEN</button>
-    <button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="showScreen('home')">
-      ← Zurück</button>
+    <button class="btn btn-blue" style="width:100%;height:52px;font-size:17px" onclick="startSystem()">
+      Speichern &amp; Starten</button>
+    <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="showScreen('home')">
+      Zurück</button>
   </div>
 </div>
 
@@ -358,14 +864,14 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
   <!-- TOP BAR -->
   <div class="main-top">
     <span class="logo">S . A . V . E . R .&ensp;DRONE</span>
-    <span id="badge" class="badge badge-normal">●&ensp;BEREIT</span>
+    <span id="badge" class="badge badge-normal">Bereit</span>
     <span class="clock" id="clock"></span>
-    <button class="btn-icon" onclick="openModal('qr')" title="Handy-Remote">📱</button>
-    <button class="btn-icon" onclick="openModal('stats')" title="Statistik">📊</button>
-    <button class="btn-icon" onclick="openModal('logbook')" title="Logbuch">📋</button>
-    <button class="btn-icon" onclick="openModal('settings')" title="Einstellungen">⚙</button>
-    <button class="btn-icon" id="grid-toggle-btn" onclick="toggleGrid()" title="Planungsgitter ein/aus" style="font-size:15px">⊞</button>
-    <button class="btn-icon" onclick="shutdownSystem()" title="System beenden" style="color:#ff4455">⏻</button>
+    <button class="btn-icon" onclick="openModal('qr')" title="Handy-Remote">&#9003;</button>
+    <button class="btn-icon" onclick="openModal('stats')" title="Statistik">&#9783;</button>
+    <button class="btn-icon" onclick="openModal('logbook')" title="Logbuch">&#128221;</button>
+    <button class="btn-icon" onclick="openModal('settings')" title="Einstellungen">&#9881;</button>
+    <button class="btn-icon" id="grid-toggle-btn" onclick="toggleGrid()" title="Planungsgitter ein/aus" style="font-size:15px">&#8862;</button>
+    <button class="btn-icon destructive" onclick="shutdownSystem()" title="System beenden">&#9211;</button>
   </div>
   <!-- CONTENT -->
   <div class="main-body">
@@ -378,7 +884,7 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
              onerror="_onStreamError()">
         <canvas id="grid-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;display:none"></canvas>
       </div>
-      <div class="video-placeholder" id="video-ph">📷&ensp;Kamera wird gestartet …</div>
+      <div class="video-placeholder" id="video-ph">Kamera wird gestartet …</div>
       <div class="banner" id="banner"></div>
       <div id="person-overlays" style="position:absolute;inset:0;pointer-events:none;z-index:15"></div>
       <div id="sens-popup-container" style="position:absolute;inset:0;pointer-events:none;z-index:30"></div>
@@ -387,7 +893,7 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
     <!-- SIDE PANEL -->
     <div class="side" id="side-panel">
       <div class="status-box normal" id="status-box">
-        <div class="status-lbl" id="status-lbl" style="color:var(--green)">●&ensp;BEREIT</div>
+        <div class="status-lbl normal" id="status-lbl">Bereit</div>
       </div>
       <div class="card side-card">
         <div class="label">PERSONEN IM BILD</div>
@@ -399,31 +905,31 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
       </div>
       <div class="card side-card">
         <div class="side-row"><span class="k">Empfindlichkeit</span>
-          <span class="v" id="s-sens" style="color:var(--green)">Mittel</span></div>
+          <span class="v" id="s-sens">Mittel</span></div>
       </div>
       <div class="side-sep"></div>
-      <div class="side-section">🚁&ensp;DROHNE</div>
+      <div class="side-section">Drohne</div>
       <div class="card side-card" id="drone-card">
         <div class="side-row"><span class="k">Pico</span><span class="v" id="s-pico">–</span></div>
-        <div class="side-row"><span class="k">Modus</span><span class="v" id="s-dmode" style="color:#6677aa">BEREIT</span></div>
+        <div class="side-row"><span class="k">Modus</span><span class="v" id="s-dmode" style="color:var(--indigo)">Bereit</span></div>
         <div class="side-row"><span class="k">ArUco</span><span class="v" id="s-aruco" style="color:var(--muted)">–</span></div>
         <div class="side-row"><span class="k">Cmd</span><span class="v" id="s-nav" style="color:var(--muted)">–</span></div>
       </div>
       <div id="drown-section" style="display:none">
         <div class="side-sep"></div>
-        <div class="side-section">🚨&ensp;ERTRINKENDE</div>
+        <div class="side-section">Ertrinkende</div>
         <div class="drown-list" id="drown-list"></div>
       </div>
       <div class="side-sep"></div>
-      <button id="drone-stop" onclick="droneStop()">🛑&ensp;DROHNE STOPP</button>
-      <button id="aruco-reset" onclick="arucoReset()">↺&ensp;ArUco Reset</button>
+      <button id="drone-stop" onclick="droneStop()">Drohne Stopp</button>
+      <button id="aruco-reset" onclick="arucoReset()">ArUco Reset</button>
       <div class="tg-status">Telegram ✓</div>
     </div>
   </div>
   <!-- BOTTOM BAR -->
   <div class="main-bot" id="main-bot">
     <span class="bot-msg" id="bot-msg" style="color:var(--green)">
-      ✅&ensp;System aktiv – Alle Personen werden überwacht</span>
+      System aktiv – Alle Personen werden überwacht</span>
     <div class="bot-actions" id="bot-actions" style="display:none"></div>
   </div>
 </div>
@@ -434,7 +940,7 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
 <div class="modal-bg" id="modal-logbook">
   <div class="modal" style="max-width:750px;height:80vh">
     <div class="modal-header">
-      <h2>📋&ensp;Logbuch</h2>
+      <h2>Logbuch</h2>
       <select id="log-filter" onchange="renderLogbook()" style="width:160px;margin-left:auto;margin-right:12px">
         <option>Alle</option><option>Alarme</option><option>Fehlalarme</option>
         <option>Rettungen</option><option>System</option>
@@ -445,8 +951,8 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
     <div class="modal-footer">
       <span id="log-count" style="font-size:12px;color:var(--muted)"></span>
       <span style="flex:1"></span>
-      <button class="btn btn-red btn-sm" onclick="clearLog()">🗑&ensp;Logbuch leeren</button>
-      <button class="btn btn-blue btn-sm" onclick="exportLogCsv()">📥&ensp;CSV Export</button>
+      <button class="btn btn-red btn-sm" onclick="clearLog()">Logbuch leeren</button>
+      <button class="btn btn-blue btn-sm" onclick="exportLogCsv()">CSV Export</button>
     </div>
   </div>
 </div>
@@ -455,7 +961,7 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
 <div class="modal-bg" id="modal-stats">
   <div class="modal" style="max-width:880px;height:85vh">
     <div class="modal-header">
-      <h2>📊&ensp;Statistik-Dashboard</h2>
+      <h2>Statistik</h2>
       <select id="stats-range" onchange="renderStats()" style="width:140px;margin-left:auto;margin-right:12px">
         <option>Heute</option><option selected>7 Tage</option><option>30 Tage</option><option>Gesamt</option>
       </select>
@@ -464,7 +970,7 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
     <div class="modal-body" id="stats-body"></div>
     <div class="modal-footer">
       <span style="flex:1"></span>
-      <button class="btn btn-red btn-sm" onclick="clearStats()">🗑&ensp;Statistik zurücksetzen</button>
+      <button class="btn btn-red btn-sm" onclick="clearStats()">Statistik zurücksetzen</button>
     </div>
   </div>
 </div>
@@ -473,11 +979,11 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
 <div class="modal-bg" id="modal-settings">
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
-      <h2>⚙&ensp;Einstellungen</h2>
+      <h2>Einstellungen</h2>
       <button class="close" onclick="closeModal('settings')">&times;</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:12px;color:#556677;margin-bottom:16px">Kamera-Änderungen erfordern einen Neustart. Alle anderen Änderungen wirken sofort.</p>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Kamera-Änderungen erfordern einen Neustart. Alle anderen wirken sofort.</p>
 
       <div class="form-section">
         <h3>Kamera</h3>
@@ -531,13 +1037,13 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
       <div class="form-section">
         <h3>Überwachungsbereich</h3>
         <button class="btn btn-blue btn-sm" onclick="closeModal('settings');openZoneEditor()">
-          📷&ensp;Bereiche bearbeiten</button>
+          Bereiche bearbeiten</button>
         <div id="set-zone-status" class="zone-status" style="color:var(--muted);margin-top:6px"></div>
       </div>
     </div>
     <div class="modal-footer">
       <span style="flex:1"></span>
-      <button class="btn btn-green btn-sm" onclick="applySettings()">✓&ensp;Übernehmen &amp; Schließen</button>
+      <button class="btn btn-blue btn-sm" onclick="applySettings()">Übernehmen</button>
     </div>
   </div>
 </div>
@@ -546,26 +1052,23 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
 <div class="modal-bg" id="modal-qr">
   <div class="modal" style="max-width:400px">
     <div class="modal-header">
-      <h2>📱&ensp;Handy-Remote</h2>
+      <h2>Handy-Remote</h2>
       <button class="close" onclick="closeModal('qr')">&times;</button>
     </div>
     <div class="modal-body" style="text-align:center;padding:24px 30px 28px">
       <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
         PC und Handy müssen im gleichen WLAN sein.</p>
-      <!-- QR code -->
-      <div id="qr-canvas-wrap" style="display:inline-block;background:#fff;padding:12px;border-radius:10px;margin-bottom:16px"></div>
-      <!-- URL box -->
-      <div style="background:#0e0e20;padding:10px 14px;border-radius:10px;margin-bottom:18px;display:flex;align-items:center;gap:8px">
-        <code id="qr-url" style="flex:1;font-size:14px;color:var(--blue);word-break:break-all;text-align:left"></code>
+      <div id="qr-canvas-wrap" style="display:inline-block;background:#fff;padding:14px;border-radius:16px;margin-bottom:16px;box-shadow:0 4px 20px rgba(40,50,80,0.14)"></div>
+      <div style="background:rgba(255,255,255,0.45);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:10px 14px;border-radius:14px;margin-bottom:18px;display:flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,0.65)">
+        <code id="qr-url" style="flex:1;font-size:13px;color:var(--blue);word-break:break-all;text-align:left"></code>
         <button id="qr-copy-btn" onclick="copyQrUrl()" title="Kopieren"
-          style="flex-shrink:0;background:#1a1a3a;border:1px solid #334;color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px">📋</button>
+          style="flex-shrink:0;background:rgba(255,255,255,0.60);border:1px solid rgba(255,255,255,0.70);color:var(--muted);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;font-weight:500">Kopieren</button>
       </div>
-      <!-- Share / Copy -->
       <div style="display:flex;gap:10px;justify-content:center">
         <button id="qr-share-btn" onclick="shareQrUrl()"
-          style="background:var(--blue);color:#fff;border:none;padding:9px 22px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">🔗&ensp;Teilen</button>
+          style="background:linear-gradient(180deg,#3EA3FF,#0065F0);color:#fff;border:none;padding:10px 24px;border-radius:14px;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit;box-shadow:0 4px 14px rgba(0,100,240,0.32)">Teilen</button>
         <button onclick="copyQrUrl()"
-          style="background:#1a1a3a;border:1px solid #334;color:var(--text);padding:9px 22px;border-radius:8px;cursor:pointer;font-size:14px">📋&ensp;Kopieren</button>
+          style="background:rgba(255,255,255,0.50);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.65);color:var(--text2);padding:10px 24px;border-radius:14px;cursor:pointer;font-size:14px;font-weight:500;font-family:inherit">Kopieren</button>
       </div>
     </div>
   </div>
@@ -575,13 +1078,13 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
 <div class="modal-bg" id="modal-zones">
   <div class="modal" style="max-width:960px;height:85vh">
     <div class="modal-header">
-      <h2>🎯&ensp;Nichtwasserbereiche markieren</h2>
+      <h2>Nichtwasserbereiche</h2>
       <button class="close" onclick="closeZoneEditor()">&times;</button>
     </div>
-    <p style="font-size:12px;color:#778899;padding:8px 18px">
-      Ziehe Rechtecke über Bereiche die NICHT überwacht werden sollen. Rechtsklick = Zone löschen.</p>
+    <p style="font-size:13px;color:var(--muted);padding:8px 20px">
+      Rechtecke über Bereiche ziehen, die nicht überwacht werden sollen. Rechtsklick = Zone löschen.</p>
     <div class="modal-body" style="padding:0;flex:1;display:flex;align-items:center;justify-content:center;
-         position:relative;background:#030310" id="zone-canvas-wrap">
+         position:relative;background:#000" id="zone-canvas-wrap">
       <img id="zone-img" style="max-width:100%;max-height:100%;object-fit:contain" draggable="false">
       <canvas id="zone-canvas" style="position:absolute;cursor:crosshair"></canvas>
     </div>
@@ -589,12 +1092,12 @@ label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px}
       <span id="zone-count" class="zone-info">Keine Zonen definiert</span>
       <button class="btn btn-red btn-sm" onclick="clearAllZones()">Alle löschen</button>
       <span style="flex:1"></span>
-      <button class="btn btn-green btn-sm" onclick="saveZones()">✓&ensp;Fertig</button>
+      <button class="btn btn-blue btn-sm" onclick="saveZones()">Fertig</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════ JAVASCRIPT ══════════════════════ -->
+<!-- ══════════════════════ JAVASCRIPT (unverändert) ══════════════════════ -->
 <script>
 // ── STATE ────────────────────────────────────────────────────────────────────
 let savedConfig = null;
@@ -603,19 +1106,18 @@ let exclusionZones = [];
 let pollTimer = null;
 let lastState = null;
 let anchors = {};
-let lastKnownPos = {}; // pid → {x,y} in normalized [0,1] — persists until rescue done
+let lastKnownPos = {};
 let _gpsClipTimer = null;
 const EVT = {
-  ALARM:              {color:'#ff2233',icon:'🚨',label:'Alarm'},
-  RETTUNG_BESTAETIGT: {color:'#ff8800',icon:'🚁',label:'Rettung bestätigt'},
-  FEHLALARM:          {color:'#888888',icon:'❌',label:'Fehlalarm'},
-  RETTUNG_FERTIG:     {color:'#00cc66',icon:'✅',label:'Rettung abgeschlossen'},
-  SYSTEM_START:       {color:'#0088ff',icon:'▶',label:'System gestartet'},
-  SYSTEM_STOP:        {color:'#556677',icon:'⏹',label:'System gestoppt'},
-  AWARENESS_ALARM:    {color:'#ff8800',icon:'🔔',label:'Anwesenheits-Alarm'},
+  ALARM:              {color:'var(--red)',   icon:'',label:'Alarm'},
+  RETTUNG_BESTAETIGT: {color:'var(--orange)',icon:'',label:'Rettung bestätigt'},
+  FEHLALARM:          {color:'var(--muted)', icon:'',label:'Fehlalarm'},
+  RETTUNG_FERTIG:     {color:'var(--green)', icon:'',label:'Rettung abgeschlossen'},
+  SYSTEM_START:       {color:'var(--blue)',  icon:'',label:'System gestartet'},
+  SYSTEM_STOP:        {color:'var(--muted)', icon:'',label:'System gestoppt'},
+  AWARENESS_ALARM:    {color:'var(--orange)',icon:'',label:'Anwesenheits-Alarm'},
 };
 
-// ── API ──────────────────────────────────────────────────────────────────────
 async function apiGet(path){
   const r=await fetch(path);return r.json();
 }
@@ -624,7 +1126,6 @@ async function apiPost(path,data){
     body:JSON.stringify(data||{})});return r.json();
 }
 
-// ── SCREEN MANAGEMENT ────────────────────────────────────────────────────────
 function showScreen(name){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   const el=document.getElementById('screen-'+name);
@@ -663,7 +1164,6 @@ function closeModal(name){
   if(el) el.classList.remove('active');
 }
 
-// ── HOME SCREEN ──────────────────────────────────────────────────────────────
 async function initHome(){
   document.getElementById('home-url').textContent=location.origin;
   try{
@@ -676,7 +1176,6 @@ async function initHome(){
         `<b>${cfg.cam}</b> · ${cfg.sens||'Mittel'} · GPS ${cfg.use_gps?'an':'aus'}`;
     }
   }catch(e){}
-  // Check if already running
   try{
     const s=await apiGet('/api/status');
     if(s.running) showScreen('main');
@@ -692,7 +1191,6 @@ async function quickStart(){
   }catch(e){showScreen('setup');}
 }
 
-// ── SETUP SCREEN ─────────────────────────────────────────────────────────────
 function loadSetupFromConfig(){
   if(!savedConfig) return;
   document.getElementById('cfg-cam').value=savedConfig.cam||'Hauptkamera';
@@ -750,7 +1248,7 @@ async function startSystem(){
   if(cfg.use_gps){
     const gpsVals=[cfg.lat1,cfg.lon1,cfg.lat2,cfg.lon2].map(Number);
     if(gpsVals.some(isNaN)){
-      err.textContent='⚠️ Bitte alle GPS-Felder korrekt ausfüllen'; return;
+      err.textContent='Bitte alle GPS-Felder korrekt ausfüllen'; return;
     }
   }
   err.textContent='';
@@ -761,7 +1259,6 @@ async function startSystem(){
   }catch(e){ err.textContent='Server nicht erreichbar'; }
 }
 
-// ── MAIN SCREEN POLLING ──────────────────────────────────────────────────────
 function startPolling(){
   if(pollTimer) return;
   poll();
@@ -778,63 +1275,51 @@ async function poll(){
 }
 
 function updateMainScreen(s){
-  // Clock
   document.getElementById('clock').textContent=s.clock||'';
-  // Persons & Alarms
   document.getElementById('s-persons').textContent=s.persons;
   document.getElementById('s-alarms').textContent=s.alarms;
   document.getElementById('s-sens').textContent=s.sensitivity||'Mittel';
-  // Badge
   const badge=document.getElementById('badge');
   const statusBox=document.getElementById('status-box');
   const statusLbl=document.getElementById('status-lbl');
   if(s.state==='ALARM'){
-    badge.className='badge badge-alarm';badge.innerHTML='🚨&ensp;ALARM';
+    badge.className='badge badge-alarm';badge.textContent='Alarm';
     statusBox.className='status-box alarm';
-    statusLbl.innerHTML='🚨&ensp;ALARM';statusLbl.style.color='#ff3333';
+    statusLbl.className='status-lbl alarm';statusLbl.textContent='Alarm';
   }else if(s.state==='RESCUE'){
-    badge.className='badge badge-rescue';badge.innerHTML='🏊&ensp;RETTUNG LÄUFT';
+    badge.className='badge badge-rescue';badge.textContent='Rettung läuft';
     statusBox.className='status-box rescue';
-    statusLbl.innerHTML='🏊&ensp;RETTUNG LÄUFT';statusLbl.style.color='var(--orange)';
+    statusLbl.className='status-lbl rescue';statusLbl.textContent='Rettung läuft';
   }else{
-    badge.className='badge badge-normal';badge.innerHTML='●&ensp;BEREIT';
+    badge.className='badge badge-normal';badge.textContent='Bereit';
     statusBox.className='status-box normal';
-    statusLbl.innerHTML='●&ensp;BEREIT';statusLbl.style.color='var(--green)';
+    statusLbl.className='status-lbl normal';statusLbl.textContent='Bereit';
   }
-  // Banner
   const banner=document.getElementById('banner');
   if(s.state==='ALARM'){
     banner.className='banner alarm';
     const gps=s.use_gps?` – GPS ${(s.alarm_lat||0).toFixed(5)}, ${(s.alarm_lon||0).toFixed(5)}`:'';
-    banner.textContent=`🚨 ALARM – Person #${s.alarm_pid||'?'}${gps} – SOFORT HANDELN!`;
+    banner.textContent=`Alarm – Person #${s.alarm_pid||'?'}${gps} – Sofort handeln`;
   }else if(s.state==='RESCUE'){
     banner.className='banner rescue';
-    banner.textContent='🏊 RETTUNG LÄUFT – Drohne fliegt zur Person';
+    banner.textContent='Rettung läuft – Drohne fliegt zur Person';
   }else{
     banner.className='banner';
   }
-  // Blink
   const mainEl=document.getElementById('screen-main');
   if(s.state==='ALARM'||s.state==='RESCUE') mainEl.classList.add('blink-alarm');
   else mainEl.classList.remove('blink-alarm');
-  // Bottom bar
   updateBottomBar(s);
-  // Drone
   updateDrone(s.drone||{});
-  // Person overlays
   try{ updatePersonOverlays(s); }catch(e){ console.error('overlay error:',e); }
-  // Video placeholder
   if(s.running) document.getElementById('video-ph').style.display='none';
   if(_gridVisible) drawGrid();
-  // GPS clipboard: copy every 5s during ALARM/RESCUE when GPS active
   _updateGpsClipboard(s);
-  // Awareness
   if(s.awareness_pending && s.state==='NORMAL'){
-    showBotMsg('🔔 Bitte Anwesenheit bestätigen!','var(--orange)');
-    showBotActions([{text:'✅ ICH BIN DA – Anwesenheit bestätigen',cls:'btn-green',
+    showBotMsg('Bitte Anwesenheit bestätigen','var(--orange)');
+    showBotActions([{text:'Anwesenheit bestätigen',cls:'btn-blue',
       action:()=>apiPost('/api/action',{action:'awareness'})}]);
   }
-  // TG action note
   if(s.tg_action_note && s.state==='NORMAL'){
     showBotMsg(s.tg_action_note,'var(--blue)');
   }
@@ -846,34 +1331,33 @@ function updateBottomBar(s){
   const actions=document.getElementById('bot-actions');
   if(s.state==='ALARM'){
     actions.style.display='none';
-    // On mobile, side panel is hidden — show brief inline action buttons
     if(window.innerWidth<=768){
       msg.style.display='none';
       actions.style.display='flex';
       actions.innerHTML='';
       const bm1=document.createElement('button');
-      bm1.className='btn btn-green';bm1.innerHTML='✅&ensp;Bestätigen';
+      bm1.className='btn btn-blue';bm1.textContent='Bestätigen';
       bm1.onclick=()=>apiPost('/api/action',{action:'confirm'});
       const bm2=document.createElement('button');
-      bm2.className='btn btn-red';bm2.innerHTML='❌&ensp;Fehlalarm';
+      bm2.className='btn btn-red';bm2.textContent='Fehlalarm';
       bm2.onclick=()=>apiPost('/api/action',{action:'false_alarm'});
       actions.appendChild(bm1);actions.appendChild(bm2);
     }else{
-      showBotMsg('🚨 ALARM – Aktionen im Side Panel rechts','#ff3333');
+      showBotMsg('Alarm – Aktionen im Side Panel rechts','var(--red)');
     }
   }else if(s.state==='RESCUE'){
     msg.style.display='none';
     actions.style.display='flex';
     actions.innerHTML='';
     const b=document.createElement('button');
-    b.className='btn btn-orange';b.style.maxWidth='600px';
-    b.innerHTML='🏊&ensp;RETTUNG ABGESCHLOSSEN – System zurücksetzen';
+    b.className='btn btn-blue';b.style.maxWidth='600px';
+    b.textContent='Rettung abgeschlossen – System zurücksetzen';
     b.onclick=()=>apiPost('/api/action',{action:'done'});
     actions.appendChild(b);
   }else{
     actions.style.display='none';
     if(!s.awareness_pending && !s.tg_action_note){
-      showBotMsg('✅ System aktiv – Alle Personen werden überwacht','var(--green)');
+      showBotMsg('System aktiv – Alle Personen werden überwacht','var(--green)');
     }
   }
 }
@@ -896,11 +1380,11 @@ function showBotActions(btns){
 function updateDrone(d){
   const pico=document.getElementById('s-pico');
   pico.textContent=(d.pico||'–').substring(0,22);
-  pico.style.color=(d.pico||'').includes('Verbunden')?'var(--green)':'#888';
+  pico.style.color=(d.pico||'').includes('Verbunden')?'var(--green)':'var(--muted)';
   const mode=document.getElementById('s-dmode');
-  if(d.reached){mode.textContent='ZIEL ERREICHT';mode.style.color='var(--green)';}
-  else if(d.autonomous){mode.textContent='AUTONOM ✈';mode.style.color='var(--orange)';}
-  else{mode.textContent='BEREIT';mode.style.color='#6677aa';}
+  if(d.reached){mode.textContent='Ziel erreicht';mode.style.color='var(--green)';}
+  else if(d.autonomous){mode.textContent='Autonom';mode.style.color='var(--orange)';}
+  else{mode.textContent='Bereit';mode.style.color='var(--indigo)'}
   const aruco=document.getElementById('s-aruco');
   if(d.aruco_pos && d.orientation_angle!==null){
     aruco.textContent=`${d.aruco_pos[0]},${d.aruco_pos[1]} | ${d.orientation_angle.toFixed(0)}°`;
@@ -912,8 +1396,7 @@ function updateDrone(d){
   nav.style.color=cmd?'var(--orange)':'var(--muted)';
 }
 
-// ── PERSON OVERLAYS (side panel + hover highlight) ──────────────────────────
-let _lastDrownStatus=null; // cache to avoid needless DOM rebuilds
+let _lastDrownStatus=null;
 function updatePersonOverlays(s){
   const overlay=document.getElementById('person-overlays');
   const section=document.getElementById('drown-section');
@@ -926,7 +1409,6 @@ function updatePersonOverlays(s){
   const frameW=s.frame_size?s.frame_size[0]:1;
   const frameH=s.frame_size?s.frame_size[1]:1;
 
-  // Update anchors for highlight positioning
   allDrowning.forEach(pid=>{
     const pidStr=String(pid);
     if(mold[pidStr]){
@@ -939,10 +1421,8 @@ function updatePersonOverlays(s){
       }
     }else if(!anchors[pid]) anchors[pid]={x:0.5,y:0.4};
   });
-  // Clean up anchors for removed persons
   for(const pid in anchors){ if(!allDrowning.has(Number(pid))) delete anchors[pid]; }
 
-  // Hide section when no drowning
   if(!allDrowning.size || (state!=='ALARM'&&state!=='RESCUE')){
     section.style.display='none';
     overlay.innerHTML='';
@@ -953,12 +1433,10 @@ function updatePersonOverlays(s){
   }
   section.style.display='';
 
-  // Build a status key to detect changes
   const statusKey=[...allDrowning].sort().map(p=>p+':'+(locked.has(p)?'L':'M')).join(',');
   if(statusKey===_lastDrownStatus) return;
   _lastDrownStatus=statusKey;
 
-  // Rebuild the side panel list
   list.innerHTML='';
   allDrowning.forEach(pid=>{
     const isLocked=locked.has(pid);
@@ -967,23 +1445,21 @@ function updatePersonOverlays(s){
     entry.dataset.pid=String(pid);
     if(isLocked){
       entry.innerHTML=`<div class="de-head">
-          <span class="de-name">🚁 Person #${pid}</span>
+          <span class="de-name">Drohne • Person #${pid}</span>
           <span class="de-status" style="color:var(--orange)">Rettung läuft</span>
         </div>`;
     }else{
       entry.innerHTML=`<div class="de-head">
-          <span class="de-name">🚨 Person #${pid}</span>
+          <span class="de-name">Person #${pid}</span>
           <span class="de-status">Ertrinken erkannt</span>
         </div>
         <div class="de-actions">
-          <button class="de-yes" onclick="event.stopPropagation();confirmPerson(${pid})">✅ Bestätigen</button>
-          <button class="de-no" onclick="event.stopPropagation();dismissPerson(${pid})">❌ Fehlalarm</button>
+          <button class="de-yes" onclick="event.stopPropagation();confirmPerson(${pid})">Bestätigen</button>
+          <button class="de-no" onclick="event.stopPropagation();dismissPerson(${pid})">Fehlalarm</button>
         </div>`;
     }
-    // Hover → show highlight ring on video
     entry.addEventListener('mouseenter',()=>showPersonHighlight(pid,isLocked));
     entry.addEventListener('mouseleave',()=>hidePersonHighlight());
-    // Touch: toggle on tap
     entry.addEventListener('touchstart',e=>{
       e.preventDefault();showPersonHighlight(pid,isLocked);
       setTimeout(hidePersonHighlight,2000);
@@ -991,7 +1467,6 @@ function updatePersonOverlays(s){
     list.appendChild(entry);
   });
 
-  // Mobile: clone entries into floating panel above bottom bar
   let mp=document.getElementById('mobile-drown');
   if(!mp){
     mp=document.createElement('div');mp.id='mobile-drown';mp.className='mobile-drown';
@@ -1019,10 +1494,9 @@ function showPersonHighlight(pid,isLocked){
   ring.id='person-hl-active';
   ring.style.left=(offX+a.x*rendW)+'px';
   ring.style.top=(offY+a.y*rendH)+'px';
-  // Add label
   const lbl=document.createElement('span');
-  lbl.style.cssText='position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;color:#ff4455;white-space:nowrap;text-shadow:0 0 4px #000';
-  if(isLocked){lbl.style.color='var(--orange)';}
+  lbl.style.cssText='position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;white-space:nowrap;color:#fff;background:rgba(255,55,48,.90);padding:2px 8px;border-radius:6px';
+  if(isLocked){lbl.style.background='rgba(255,150,0,.90)';}
   lbl.textContent='Person #'+pid;
   ring.appendChild(lbl);
   overlay.appendChild(ring);
@@ -1034,17 +1508,16 @@ function hidePersonHighlight(){
 
 async function confirmPerson(pid){
   closeSensPopup();
-  _lastDrownStatus=null; // force rebuild
+  _lastDrownStatus=null;
   await apiPost('/api/confirm_person',{pid});
 }
 async function dismissPerson(pid){
   closeSensPopup();
-  _lastDrownStatus=null; // force rebuild
+  _lastDrownStatus=null;
   await apiPost('/api/dismiss',{pid});
   delete anchors[pid];
 }
 
-// ── VIDEO CLICK → SENSITIVITY ────────────────────────────────────────────────
 async function _handleVideoClick(xn,yn,event){
   closeSensPopup();
   try{
@@ -1056,8 +1529,7 @@ async function _handleVideoClick(xn,yn,event){
     }
   }catch(e){}
 }
-// legacy inline handler (kept for compatibility)
-function onVideoClick(event){ /* handled via area click listener */ }
+function onVideoClick(event){}
 
 function showSensPopup(pid,cur,px,py){
   closeSensPopup();
@@ -1068,11 +1540,11 @@ function showSensPopup(pid,cur,px,py){
   div.innerHTML=`
     <div class="title">Person #${pid}</div>
     <div class="current">Aktuell: ${curTxt}</div>
-    <button style="background:#004466" onclick="setSensitivity(${pid},0.5)">🔍 Genauer beobachten</button>
-    <button style="background:#444400" onclick="setSensitivity(${pid},2.0)">😌 Weniger beobachten</button>
-    <button style="background:#1a1a40" onclick="setSensitivity(${pid},1.0)">↩ Normal</button>
+    <button style="background:linear-gradient(180deg,#3EA3FF,#0065F0)" onclick="setSensitivity(${pid},0.5)">Genauer beobachten</button>
+    <button style="background:rgba(120,120,140,0.18);color:var(--text2)" onclick="setSensitivity(${pid},2.0)">Weniger beobachten</button>
+    <button style="background:rgba(120,120,140,0.10);color:var(--text2)" onclick="setSensitivity(${pid},1.0)">Zurück zu Normal</button>
     <button style="background:transparent;color:var(--muted);font-size:11px"
-            onclick="closeSensPopup()">✕ Schließen</button>`;
+            onclick="closeSensPopup()">Schließen</button>`;
   const area=document.getElementById('video-area');
   const maxX=area.clientWidth-190;const maxY=area.clientHeight-200;
   div.style.left=Math.max(0,Math.min(px-70,maxX))+'px';
@@ -1088,18 +1560,15 @@ async function setSensitivity(pid,mult){
   await apiPost('/api/sensitivity',{pid,mult});
 }
 
-// ── SYSTEM SHUTDOWN ──────────────────────────────────────────────────────────
 async function shutdownSystem(){
   if(!confirm('System komplett herunterfahren?')) return;
   await apiPost('/api/shutdown');
-  document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#556677;font-size:20px">⏻&ensp;System wurde beendet. Fenster kann geschlossen werden.</div>';
+  document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#8888a0;font-size:18px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0c10">System beendet. Fenster kann geschlossen werden.</div>';
 }
 
-// ── DRONE CONTROLS ───────────────────────────────────────────────────────────
 async function droneStop(){await apiPost('/api/drone/stop');}
 async function arucoReset(){await apiPost('/api/drone/aruco_reset');}
 
-// ── LOGBOOK ──────────────────────────────────────────────────────────────────
 let logEntries=[];
 async function renderLogbook(){
   try{logEntries=await apiGet('/api/log');}catch(e){logEntries=[];}
@@ -1120,7 +1589,7 @@ async function renderLogbook(){
     const gps=(e.gps&&e.gps.lat!=null)?`📍 ${Number(e.gps.lat).toFixed(5)}, ${Number(e.gps.lon).toFixed(5)}`:'';
     html+=`<tr><td style="white-space:nowrap">${e.ts||''}</td>
       <td><span style="color:${st.color}">${st.icon} ${st.label}</span></td>
-      <td>${e.details||''}${gps?' <small style="color:#556677">'+gps+'</small>':''}</td>
+      <td>${e.details||''}${gps?' <small style="color:var(--muted)">'+gps+'</small>':''}</td>
       <td>${e.person_id!=null?'#'+e.person_id:''}</td></tr>`;
   }
   html+='</tbody></table>';
@@ -1142,7 +1611,6 @@ function exportLogCsv(){
   a.click();
 }
 
-// ── STATS ────────────────────────────────────────────────────────────────────
 async function renderStats(){
   let entries=[];
   try{entries=await apiGet('/api/log');}catch(e){}
@@ -1171,9 +1639,8 @@ async function renderStats(){
     <div class="kpi"><div class="val" style="color:${rateColor}">${falseRate.toFixed(0)}%</div><div class="lbl">Fehlalarm-Quote</div></div>
     <div class="kpi"><div class="val" style="color:var(--green)">${nRescue}</div><div class="lbl">Rettungen</div></div>
     <div class="kpi"><div class="val" style="color:var(--blue)">${avgP.toFixed(1)}</div><div class="lbl">⌀ Personen</div></div>
-    <div class="kpi"><div class="val" style="color:#8888cc">${nConfirm}</div><div class="lbl">Bestätigt</div></div>
+    <div class="kpi"><div class="val" style="color:var(--indigo,#5E5CE6)">${nConfirm}</div><div class="lbl">Bestätigt</div></div>
   </div>`;
-  // Bar chart
   const alarmE=entries.filter(e=>['ALARM','FEHLALARM','RETTUNG_FERTIG'].includes(e.type));
   if(alarmE.length){
     const counts={};alarmE.forEach(e=>{const d=(e.ts||'').slice(0,10);counts[d]=(counts[d]||0)+1;});
@@ -1187,7 +1654,6 @@ async function renderStats(){
     });
     html+='</div>';
   }
-  // Distribution table
   html+=`<h3 style="font-size:13px;color:var(--text);margin:20px 0 8px">Alarm-Verteilung</h3>
     <table class="log-table"><tbody>
     <tr><td style="color:var(--red)">Alarme (netto)</td><td>${Math.max(0,nAlarm-nFalse)}</td></tr>
@@ -1202,16 +1668,13 @@ async function clearStats(){
   await apiPost('/api/log/clear');renderStats();
 }
 
-// ── SETTINGS MODAL ───────────────────────────────────────────────────────────
 function toggleSetGps(){
   document.getElementById('set-gps-fields').style.display=
     document.getElementById('set-gps').checked?'block':'none';
 }
 function loadSettingsModal(){
-  // Sensitivity
   const radios=document.querySelectorAll('input[name="set-sens"]');
   radios.forEach(r=>r.checked=(r.value===currentSens));
-  // All other fields from savedConfig
   const cfg=savedConfig||{};
   const camEl=document.getElementById('set-cam');
   if(camEl) camEl.value=cfg.cam||'Hauptkamera';
@@ -1232,7 +1695,6 @@ function loadSettingsModal(){
 async function applySettings(){
   const sens=document.querySelector('input[name="set-sens"]:checked');
   if(sens) currentSens=sens.value;
-  // Build updated config
   const cfg=Object.assign({},savedConfig||{},{
     cam: document.getElementById('set-cam').value,
     sens: currentSens,
@@ -1251,7 +1713,6 @@ async function applySettings(){
   closeModal('settings');
 }
 
-// ── ZONE EDITOR ──────────────────────────────────────────────────────────────
 let zoneDrawing=false,zoneStartX=0,zoneStartY=0;
 let zoneImgRect={x:0,y:0,w:1,h:1};
 
@@ -1271,11 +1732,9 @@ async function openZoneEditor(){
   const img=document.getElementById('zone-img');
   const isRunning=document.getElementById('screen-main').classList.contains('active');
   if(isRunning){
-    // Live stream als Hintergrund
     img.onload=()=>{ img.onload=null; setupZoneCanvas(); };
     img.src='/stream';
   } else {
-    // Noch nicht gestartet – Snapshot der gewählten Kamera
     const camMap={'Hauptkamera':0,'Kamera 2':1,'Kamera 3':2};
     const cam=document.getElementById('cfg-cam')?document.getElementById('cfg-cam').value:'Hauptkamera';
     img.src='/api/snapshot?cam='+(camMap[cam]||0)+'&t='+Date.now();
@@ -1295,14 +1754,12 @@ function setupZoneCanvas(){
   const rx=(ww-rw)/2,ry=(wh-rh)/2;
   zoneImgRect={x:rx,y:ry,w:rw,h:rh};
   canvas.width=ww;canvas.height=wh;
-  // Mouse events
   canvas.onmousedown=e=>{zoneDrawing=true;zoneStartX=e.offsetX;zoneStartY=e.offsetY;};
   canvas.onmousemove=e=>{if(zoneDrawing) drawZones(e.offsetX,e.offsetY);};
   canvas.onmouseup=e=>{
     if(!zoneDrawing) return;zoneDrawing=false;
     _finishZoneDraw(e.offsetX,e.offsetY);
   };
-  // Touch events (tablet support)
   canvas.ontouchstart=e=>{
     e.preventDefault();const t=e.touches[0];const cr=canvas.getBoundingClientRect();
     zoneDrawing=true;zoneStartX=t.clientX-cr.left;zoneStartY=t.clientY-cr.top;
@@ -1347,7 +1804,7 @@ function drawZones(mx,my){
     const w=(z[2]-z[0])*r.w, h=(z[3]-z[1])*r.h;
     ctx.fillStyle='rgba(255,0,0,0.25)';ctx.fillRect(x,y,w,h);
     ctx.strokeStyle='#ff4444';ctx.lineWidth=2;ctx.strokeRect(x,y,w,h);
-    ctx.fillStyle='#ff4444';ctx.font='12px Segoe UI';
+    ctx.fillStyle='#FF453A';ctx.font='12px -apple-system,BlinkMacSystemFont,sans-serif';
     ctx.fillText('KEINE ERKENNUNG',x+4,y+16);
   });
   if(zoneDrawing&&mx!==undefined){
@@ -1372,7 +1829,6 @@ function closeZoneEditor(){
   closeModal('zones');
 }
 
-// ── GPS CLIPBOARD ─────────────────────────────────────────────────────────────
 let _lastGpsClip=0;
 function _updateGpsClipboard(s){
   if(!s.use_gps) return;
@@ -1391,7 +1847,6 @@ function _updateGpsClipboard(s){
   }).catch(()=>{});
 }
 
-// ── ZOOM / PAN ───────────────────────────────────────────────────────────────
 let _zoom=1.0, _panX=0, _panY=0;
 const ZOOM_MIN=1.0, ZOOM_MAX=8.0;
 let _zoomIndicatorTimer=null;
@@ -1401,7 +1856,6 @@ function _applyTransform(){
     `translate(${_panX}px,${_panY}px) scale(${_zoom})`;
   const area=document.getElementById('video-area');
   area.classList.toggle('zoomed',_zoom>1.001);
-  // Show zoom indicator
   const ind=document.getElementById('zoom-indicator');
   ind.textContent=_zoom.toFixed(1)+'×';
   ind.classList.add('visible');
@@ -1430,20 +1884,16 @@ function _zoomAt(cx,cy,factor){
 }
 function resetZoom(){_zoom=1;_panX=0;_panY=0;_applyTransform();}
 
-// Mouse wheel
 function _initZoomEvents(){
   const area=document.getElementById('video-area');
-  // Scroll zoom
   area.addEventListener('wheel',e=>{
     e.preventDefault();
     _zoomAt(e.clientX,e.clientY,e.deltaY<0?1.15:1/1.15);
   },{passive:false});
-  // Double-click reset
   area.addEventListener('dblclick',e=>{
     if(_zoom>1.001) resetZoom();
     else _zoomAt(e.clientX,e.clientY,2);
   });
-  // Mouse drag (pan)
   let _md=false, _mds=null;
   area.addEventListener('mousedown',e=>{
     if(e.button!==0||_zoom<=1.001) return;
@@ -1460,7 +1910,6 @@ function _initZoomEvents(){
     _md=false; _mds=null;
     document.getElementById('video-area').classList.remove('panning');
   });
-  // Touch: pinch + pan
   let _tpts={}, _lpd=null, _ltc=null, _tds=null;
   area.addEventListener('touchstart',e=>{
     e.preventDefault();
@@ -1497,13 +1946,11 @@ function _initZoomEvents(){
     if(Object.keys(_tpts).length<2){_lpd=null;_ltc=null;}
     if(Object.keys(_tpts).length===0){
       _tds=null;
-      // Snap-back: Zoom nur solange halten wie Finger auf Screen → beim Loslassen zurücksetzen
       resetZoom();
     }
   });
-  // Click on video → send to backend (only if not dragging)
   area.addEventListener('click',e=>{
-    if(_md) return; // was a drag
+    if(_md) return;
     const img=document.getElementById('video-stream');
     if(!img.naturalWidth) return;
     const rect=img.getBoundingClientRect();
@@ -1517,21 +1964,19 @@ function _initZoomEvents(){
   });
 }
 
-// ── PLANNING GRID ────────────────────────────────────────────────────────────
 let _gridVisible=false;
 function toggleGrid(){
   _gridVisible=!_gridVisible;
   const c=document.getElementById('grid-canvas');
   const btn=document.getElementById('grid-toggle-btn');
   c.style.display=_gridVisible?'block':'none';
-  btn.style.color=_gridVisible?'var(--blue)':'#667788';
+  btn.style.color=_gridVisible?'var(--blue)':'var(--muted)';
   if(_gridVisible) drawGrid();
 }
 function drawGrid(){
   const c=document.getElementById('grid-canvas');
   const area=document.getElementById('video-area');
   const img=document.getElementById('video-stream');
-  // Draw in natural (1x) coordinate space — CSS transform scales visually
   const W=area.clientWidth, H=area.clientHeight;
   c.width=W; c.height=H;
   const ctx=c.getContext('2d');
@@ -1542,11 +1987,10 @@ function drawGrid(){
   const oX=(W-rW)/2, oY=(H-rH)/2;
   const COLS=8, ROWS=6;
   const cw=rW/COLS, ch=rH/ROWS;
-  // Line thickness stays visually ~1px regardless of zoom
   ctx.strokeStyle='rgba(0,180,255,0.35)';
   ctx.lineWidth=1/_zoom;
   const fs=Math.round(11/_zoom);
-  ctx.font=`bold ${fs}px Segoe UI,sans-serif`;
+  ctx.font=`bold ${fs}px -apple-system,BlinkMacSystemFont,sans-serif`;
   ctx.textAlign='center'; ctx.textBaseline='middle';
   for(let i=0;i<=COLS;i++){
     const x=oX+i*cw;
@@ -1575,7 +2019,6 @@ function drawGrid(){
 }
 window.addEventListener('resize',()=>{ if(_gridVisible) drawGrid(); });
 
-// ── QR MODAL HELPERS ─────────────────────────────────────────────────────────
 function openQrModal(){
   const url = location.origin;
   document.getElementById('qr-url').textContent = url;
@@ -1586,7 +2029,6 @@ function openQrModal(){
     colorDark:'#000000', colorLight:'#ffffff',
     correctLevel: QRCode.CorrectLevel.M
   });
-  // Hide share button if Web Share API not available
   const shareBtn = document.getElementById('qr-share-btn');
   if(!navigator.share) shareBtn.style.display='none';
   else shareBtn.style.display='';
@@ -1616,7 +2058,6 @@ function copyQrUrl(){
 document.addEventListener('DOMContentLoaded',()=>{
   initHome();
   _initZoomEvents();
-  // Update clock every second even when not polling
   setInterval(()=>{
     const el=document.getElementById('clock');
     if(el&&document.getElementById('screen-main').classList.contains('active')){
